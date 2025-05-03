@@ -22,7 +22,7 @@ genai.configure(api_key=GEMINI_API_KEY)
 def get_db_connection():
     try:
         return mysql.connector.connect(
-            host="https://php-myadmin.net/index.php",        # Replace with your actual host
+            host="sql105.infinityfree.com",        # Replace with your actual host
             user="if0_38895579",               # Your database username
             password="YuFL0C2dugO",          # Your DB password
             database="if0_38895579_project_management"
