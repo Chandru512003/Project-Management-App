@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Project Management Assistant</title>
+    <style>
+        /* General Styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background-color: #121212; /* Dark background */
+            color: #e0e0e0; /* Light text */
+            transition: all 0.3s ease;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 25px;
+            background: linear-gradient(145deg, #1e1e1e, #232323);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border-bottom: 2px solid #333;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        h1 {
+            text-align: center;
+            margin: 0;
+            color: #bb86fc; /* Accent color for headings */
+            font-size: 1.5rem; /* Smaller font size for smaller screens */
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+        }
+        .container {
+            display: flex;
+            max-width: 1200px; /* Limit container width */
+            margin: 20px auto; /* Center the container */
+            padding: 20px;
+            background: linear-gradient(145deg, #1e1e1e, #262626);
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5); /* Enhanced shadow for depth */
+            height: calc(100vh - 150px); /* Fit to screen height minus header */
+            overflow: hidden; /* Prevent overflow */
+            flex-direction: row; /* Default layout: side by side */
+            position: relative;
+        }
+        
+        /* Left Panel (Visualization) */
+        .left-panel {
+            flex: 0.4;
+            padding: 20px;
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .left-panel h2 {
+            margin: 0 0 20px;
+            font-size: 1.2rem;
+            color: #bb86fc; /* Accent color for headings */
+            text-align: center;
+        }
+        
+        /* Chart Container */
+        .chart-container {
+            flex: 1;
+            min-height: 300px;
+            width: 100%;
+            background: rgba(30, 30, 30, 0.5);
+            border-radius: 12px;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .chart-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #bb86fc, transparent);
+            opacity: 0.7;
+        }
+        
+        /* Right Panel (Chatbot) */
+        .right-panel {
+            flex: 0.6;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Prevent overflow */
+            position: relative;
+        }
+        .right-panel h2 {
+            margin: 0 0 15px;
+            font-size: 1.2rem;
+            color: #bb86fc; /* Accent color for headings */
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Chat Box */
+        .chat-box {
+            flex: 1;
+            padding: 15px; /* Add padding inside the chat box */
+            background: linear-gradient(145deg, #1e1e1e, #2c2c2c); /* Gradient background */
+            border: 2px solid #333; /* Dark border */
+            border-radius: 12px;
+            box-shadow: inset 6px 6px 12px rgba(0, 0, 0, 0.3), inset -6px -6px 12px rgba(51, 51, 51, 0.3); /* Neumorphism effect */
+            overflow-y: auto; /* Changed from overlay for better cross-browser compatibility */
+            margin-bottom: 15px;
+            position: relative; /* Ensure proper stacking context */
+            scrollbar-width: thin; /* For Firefox */
+            scrollbar-color: #bb86fc #2c2c2c; /* For Firefox */
+        }
+        
+        /* Custom Scrollbar */
+        .chat-box::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .chat-box::-webkit-scrollbar-thumb {
+            background-color: #bb86fc; /* Accent color for scrollbar */
+            border-radius: 10px;
+        }
+        .chat-box::-webkit-scrollbar-track {
+            background-color: #2c2c2c; /* Dark track color */
+            border-radius: 10px;
+        }
+        
+        /* Message Styling */
+        .chat-box .message {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 15px;
+            max-width: 80%;
+            clear: both;
+            word-wrap: break-word;
+            position: relative;
+            animation: messageAppear 0.5s ease forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        
+        @keyframes messageAppear {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .chat-box .user-message {
+            background: linear-gradient(145deg, #3d913f, #4caf50); /* Green gradient for user messages */
+            color: #fff; /* White text for contrast */
+            float: right;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+            border-bottom-right-radius: 5px;
+        }
+        
+        .chat-box .bot-message {
+            background: linear-gradient(145deg, #1665d8, #1a73e8); /* Blue gradient for bot messages */
+            color: #fff; /* White text for contrast */
+            float: left;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+            border-bottom-left-radius: 5px;
+            max-width: 85%;
+        }
+        
+        /* Adding typing animation for bot messages */
+        .typing-indicator {
+            display: flex;
+            padding: 15px;
+            background: rgba(26, 115, 232, 0.7);
+            border-radius: 15px;
+            border-bottom-left-radius: 5px;
+            margin: 15px 0;
+            width: fit-content;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+            float: left;
+            clear: both;
+        }
+        
+        .typing-indicator span {
+            height: 10px;
+            width: 10px;
+            margin: 0 2px;
+            background-color: #fff;
+            border-radius: 50%;
+            display: inline-block;
+            opacity: 0.4;
+        }
+        
+        .typing-indicator span:nth-child(1) {
+            animation: bounce 1s infinite 0.1s;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation: bounce 1s infinite 0.3s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation: bounce 1s infinite 0.5s;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); opacity: 0.4; }
+            50% { transform: translateY(-5px); opacity: 1; }
+        }
+        
+        /* Input Area */
+        .input-area {
+            display: flex;
+            gap: 10px;
+            position: relative;
+            margin-top: auto;
+        }
+        
+        #query {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #bb86fc; /* Accent color for input */
+            border-radius: 12px;
+            font-size: 16px;
+            background-color: #1e1e1e; /* Dark background */
+            color: #e0e0e0; /* Light text */
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        #query:focus {
+            outline: none;
+            border-color: #9c27b0;
+            box-shadow: 0 0 0 3px rgba(156, 39, 176, 0.3);
+        }
+        
+        .send-btn {
+            padding: 12px 20px;
+            background: linear-gradient(145deg, #bb86fc, #9c27b0); /* Gradient button */
+            color: #121212; /* Dark text for contrast */
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .send-btn:hover {
+            background: linear-gradient(145deg, #9c27b0, #7b1fa2); /* Darker gradient on hover */
+            transform: translateY(-2px);
+            box-shadow: 0 5px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .send-btn:active {
+            transform: translateY(1px);
+        }
+        
+        /* Logout Button */
+        .logout-btn {
+            background: linear-gradient(145deg, #ff4444, #cc0000);
+            padding: 8px 16px;
+            margin-left: 10px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .logout-btn:hover {
+            background: linear-gradient(145deg, #cc0000, #aa0000);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background: linear-gradient(145deg, #1e1e1e, #262626);
+            margin: 15% auto;
+            padding: 25px;
+            border: 1px solid #bb86fc;
+            border-radius: 15px;
+            width: 80%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            animation: scaleIn 0.3s;
+        }
+        
+        @keyframes scaleIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 25px;
+        }
+        
+        .modal-buttons button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .modal-buttons button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Profile Icon and Dropdown */
+        .profile-container {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .profile-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #bb86fc, #9c27b0);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 18px;
+            border: 2px solid rgba(156, 39, 176, 0.6);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .profile-icon:hover {
+            background: linear-gradient(145deg, #9c27b0, #7b1fa2);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .profile-dropdown {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 50px;
+    background: linear-gradient(145deg, #1e1e1e, #262626);
+    border: 1px solid #bb86fc;
+    border-radius: 12px;
+    min-width: 280px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+    z-index: 1001;
+    padding: 20px;
+    transform: translateY(-10px);
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+/* Add this to fix the profile dropdown visibility on mobile */
+@media (max-width: 768px) {
+    .profile-dropdown {
+        right: 0;
+        width: 85vw;
+        max-width: 300px;
+    }
+}
+        
+        .profile-dropdown.show {
+            display: block;
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .profile-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .profile-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #bb86fc, #9c27b0);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 24px;
+            margin-right: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .profile-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #e0e0e0;
+        }
+        
+        .profile-details {
+            margin-bottom: 20px;
+        }
+        
+        .profile-details p {
+            margin: 12px 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(51, 51, 51, 0.5);
+        }
+        
+        .detail-label {
+            color: #bb86fc;
+            font-weight: 500;
+        }
+        
+        .detail-value {
+            color: #fff;
+            font-weight: 400;
+        }
+        
+        .profile-buttons {
+            display: flex;
+            justify-content: center;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 992px) {
+            .container {
+                height: calc(100vh - 120px);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            /* Stack panels vertically */
+            .container {
+                flex-direction: column;
+                height: auto; /* Allow height to adjust dynamically */
+                padding: 15px;
+                margin: 15px;
+            }
+            
+            .header {
+                padding: 10px 15px;
+            }
+            
+            /* Adjust font sizes */
+            h1 {
+                font-size: 1.2rem;
+            }
+            
+            .left-panel,
+            .right-panel {
+                padding: 15px 10px; /* Reduce padding */
+                width: 100%;
+                flex: none;
+            }
+            
+            .left-panel {
+                order: 2; /* Move chart below chat on mobile */
+                border-right: none;
+                border-top: 1px solid #333;
+                padding-top: 20px;
+                margin-top: 15px;
+                min-height: 300px;
+                height: 40vh;
+            }
+            
+            .right-panel {
+                order: 1; /* Move chat above chart on mobile */
+                height: 50vh;
+            }
+            
+            .left-panel h2,
+            .right-panel h2 {
+                font-size: 1rem;
+                margin-bottom: 10px;
+            }
+            
+            /* Adjust chart container */
+            .chart-container {
+                min-height: 200px;
+            }
+            
+            /* Adjust chat box */
+            .chat-box {
+                height: 300px; /* Fixed height for mobile */
+                margin-bottom: 10px;
+            }
+            
+            /* Adjust input area */
+            .input-area {
+                margin-top: 10px;
+            }
+            
+            #query {
+                font-size: 14px;
+                padding: 10px;
+            }
+            
+            .send-btn {
+                padding: 10px 15px;
+                font-size: 14px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1rem;
+            }
+            
+            .header {
+                padding: 8px 12px;
+            }
+            
+            .container {
+                padding: 10px;
+                margin: 10px;
+            }
+            
+            .chat-box {
+                height: 250px;
+            }
+            
+            .chart-container {
+                min-height: 180px;
+            }
+            
+            .profile-icon, .profile-avatar {
+                width: 35px;
+                height: 35px;
+                font-size: 16px;
+            }
+            
+            .profile-avatar {
+                width: 50px;
+                height: 50px;
+            }
+            
+            .send-btn {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AI-Powered Project Management Assistant</h1>
+        <div class="profile-container">
+            <div class="profile-icon" id="profileIcon" onclick="toggleProfileDropdown()">U</div>
+            <div class="profile-dropdown" id="profileDropdown">
+                <div class="profile-header">
+                    <div class="profile-avatar" id="profileAvatar">U</div>
+                    <div class="profile-name" id="profileName">Loading...</div>
+                </div>
+                <div class="profile-details">
+                    <p><span class="detail-label">User ID:</span> <span class="detail-value" id="profileUserId">Loading...</span></p>
+                    <p><span class="detail-label">Username:</span> <span class="detail-value" id="profileUsername">Loading...</span></p>
+                    <p><span class="detail-label">Role:</span> <span class="detail-value" id="profileRole">Loading...</span></p>
+                    <p><span class="detail-label">Email:</span> <span class="detail-value" id="profileEmail">Loading...</span></p>
+                </div>
+                <div class="profile-buttons">
+                    <button class="logout-btn" onclick="showLogoutConfirmation()">Logout</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container">
+        <!-- Left Panel: Visualization -->
+        <div class="left-panel">
+            <h2>Project Overview</h2>
+            <div class="chart-container">
+                <canvas id="taskChart"></canvas>
+            </div>
+        </div>
+        <!-- Right Panel: Chatbot -->
+        <div class="right-panel">
+            <h2>Chat with AI Assistant</h2>
+            <!-- Chat Box -->
+            <div class="chat-box" id="chatBox">
+                <!-- Messages will be dynamically added here -->
+                <div class="message bot-message">
+                    Hello! I'm your AI project management assistant. How can I help you today?
+                </div>
+            </div>
+            <!-- Input Area -->
+            <div class="input-area">
+                <input type="text" id="query" placeholder="Ask a question..." onkeydown="handleEnter(event)" />
+                <button class="send-btn" onclick="sendQuery()">Send</button>
+            </div>
+        </div>
+    </div>
+    <!-- Logout Confirmation Modal -->
+    <div id="logoutModal" class="modal">
+        <div class="modal-content">
+            <h3>Confirm Logout</h3>
+            <p>Are you sure you want to logout?</p>
+            <div class="modal-buttons">
+                <button onclick="performLogout()">Yes, Logout</button>
+                <button onclick="hideLogoutConfirmation()">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <!-- Include Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let taskChart;
+        let currentUser = {
+            id: null,
+            username: "",
+            role: "",
+            email: ""
+        };
+
+        // Function to fetch project status data and render the pie chart
+        async function fetchAndRenderChart() {
+            try {
+                const response = await fetch('/get_project_status');
+                const data = await response.json();
+                if (!data.labels || !data.data) {
+                    console.error("Invalid data format:", data);
+                    return;
+                }
+                const ctx = document.getElementById('taskChart').getContext('2d');
+                if (taskChart) {
+                    taskChart.destroy();
+                }
+                taskChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            label: 'Project Status',
+                            data: data.data,
+                            backgroundColor: ['#ff6384', '#36a2eb', '#4bc0c0'],
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    font: { size: 14 },
+                                    color: '#e0e0e0'
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Project Distribution',
+                                font: { size: 16 },
+                                color: '#bb86fc'
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Error fetching project status data:", error);
+                // Display fallback chart with demo data
+                displayDemoChart();
+            }
+        }
+
+        // Function to display a demo chart when API fails
+        function displayDemoChart() {
+            const ctx = document.getElementById('taskChart').getContext('2d');
+            if (taskChart) {
+                taskChart.destroy();
+            }
+            taskChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Pending', 'In Progress', 'Completed'],
+                    datasets: [{
+                        label: 'Project Status',
+                        data: [4, 7, 3],
+                        backgroundColor: ['#ff6384', '#36a2eb', '#4bc0c0'],
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: { size: 14 },
+                                color: '#e0e0e0'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Project Distribution (Demo)',
+                            font: { size: 16 },
+                            color: '#bb86fc'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Function to show typing indicator
+        function showTypingIndicator() {
+            const chatBox = document.getElementById('chatBox');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'typing-indicator';
+            typingDiv.id = 'typingIndicator';
+            typingDiv.innerHTML = '<span></span><span></span><span></span>';
+            chatBox.appendChild(typingDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return typingDiv;
+        }
+
+        // Function to remove typing indicator
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+        
+        // Function to animate text appearing letter by letter
+        function animateText(element, text, speed = 20) {
+            let index = 0;
+            element.textContent = '';
+            
+            return new Promise((resolve) => {
+                function addLetter() {
+                    if (index < text.length) {
+                        element.textContent += text.charAt(index);
+                        index++;
+                        setTimeout(addLetter, speed);
+                    } else {
+                        resolve();
+                    }
+                }
+                addLetter();
+            });
+        }
+        
+        // Function to handle Enter key press
+        function handleEnter(event) {
+            if (event.key === 'Enter') {
+                sendQuery();
+            }
+        }
+        
+        // Function to send the query to the backend
+        async function sendQuery() {
+            const queryInput = document.getElementById('query');
+            const chatBox = document.getElementById('chatBox');
+            const userMessage = queryInput.value.trim();
+            if (!userMessage) return;
+        
+            // Add user message to chat
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'message user-message';
+            userMessageDiv.textContent = userMessage;
+            chatBox.appendChild(userMessageDiv);
+        
+            // Clear input field
+            queryInput.value = '';
+            
+            // Show typing indicator
+            const typingIndicator = showTypingIndicator();
+            
+            // Focus back on input field
+            queryInput.focus();
+        
+            try {
+                const userId = currentUser.id || 1;
+                const response = await fetch('/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: userMessage, user_id: userId })
+                });
+                const result = await response.json();
+        
+                // Remove typing indicator after a small delay for natural effect
+                setTimeout(() => {
+                    removeTypingIndicator();
+                    
+                    // Create bot response div
+                    const botResponseDiv = document.createElement('div');
+                    botResponseDiv.className = 'message bot-message';
+                    chatBox.appendChild(botResponseDiv);
+        
+                    // Format response based on action type
+                    let responseText = formatBotResponse(result);
+                    
+                    // Animate the text
+                    animateText(botResponseDiv, responseText, 10).then(() => {
+                        // If HTML content is needed, replace with formatted HTML after animation
+                        if (responseText !== responseText.replace(/<[^>]*>/g, '')) {
+                            botResponseDiv.innerHTML = responseText;
+                        }
+                    });
+                    
+                    // If the response modified data, refresh the chart
+                    if (['update_project_status', 'update_task_status', 'start_add_project', 'start_add_task'].includes(result.action)) {
+                        fetchAndRenderChart();
+                    }
+                }, 800); // Delay before showing response
+            } catch (error) {
+                console.error("Error sending query:", error);
+                
+                // Remove typing indicator after small delay
+                setTimeout(() => {
+                    removeTypingIndicator();
+                    
+                    // Show error message
+                    const botResponseDiv = document.createElement('div');
+                    botResponseDiv.className = 'message bot-message';
+                    animateText(botResponseDiv, 'Sorry, I encountered an error while processing your request. Please try again.', 10);
+                    chatBox.appendChild(botResponseDiv);
+                }, 800);
+            }
+        
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+        
+        // Improved formatBotResponse function
+        function formatBotResponse(result) {
+            if (result.action) {
+                switch (result.action) {
+                    case 'get_project_status':
+                        return `Project Status: ${result.project_name || 'Unknown project'}`;
+                        
+                    case 'get_task_status':
+                        return `Task Status: ${result.task_name || 'Unknown task'}`;
+                        
+                    case 'update_project_status':
+                        return `• Updated Project: ${result.project_name || 'Unknown project'}\n• New Status: ${result.new_status || 'Unknown status'}`;
+                        
+                    case 'update_task_status':
+                        return `• Updated Task: ${result.task_name || 'Unknown task'}\n• Task Name: ${result.task_name || 'Unknown task'}\n• New Status: ${result.new_status || 'Unknown status'}`;
+                        
+                    case 'start_add_project':
+                        return `Starting Project Creation\nPlease provide the project details.`;
+                        
+                    case 'start_add_task':
+                        return `Starting Task Creation\nPlease provide the task details.`;
+                        
+                    case 'list_pending_projects':
+                    case 'list_completed_projects':
+                    case 'list_all_projects_status':
+                        if (Array.isArray(result.projects)) {
+                            let response = `${formatActionTitle(result.action)}:\n`;
+                            result.projects.forEach(proj => {
+                                response += `• ${proj.project_name || 'Unnamed'}: ${proj.status || 'Unknown status'}\n`;
+                            });
+                            return response;
+                        } else {
+                            return `No projects found for this query.`;
+                        }
+                        
+                    case 'list_pending_tasks':
+                    case 'list_completed_tasks':
+                    case 'list_all_tasks_status':
+                    case 'list_low_priority_tasks':
+                    case 'list_medium_priority_tasks':
+                    case 'list_high_priority_tasks':
+                        if (Array.isArray(result.tasks)) {
+                            let response = `${formatActionTitle(result.action)}:\n`;
+                            result.tasks.forEach(task => {
+                                response += `• ${task.task_name || 'Unnamed'}: ${task.status || 'Unknown'} (Priority: ${task.priority || 'Unspecified'})\n`;
+                            });
+                            return response;
+                        } else {
+                            return `No tasks found for this query.`;
+                        }
+                        
+                    case 'confirmation':
+                        return `Confirmation response: ${result.intent || 'Unknown intent'}`;
+                        
+                    case 'terminate_session':
+                        return `Session terminated. You can start a new conversation.`;
+                        
+                    case 'priority':
+                        return `Priority set to: ${result.priority || 'Unknown priority'}`;
+                        
+                    default:
+                        if (result.message) {
+                            // Convert paragraphs to bullet points if they contain multiple sentences
+                            if (result.message.includes('.') && result.message.split('.').length > 2) {
+                                const sentences = result.message.split('.').filter(s => s.trim().length > 0);
+                                if (sentences.length > 1) {
+                                    return sentences.map(s => `• ${s.trim()}`).join('\n');
+                                }
+                            }
+                            return result.message;
+                        } else if (result.error) {
+                            return `Error: ${result.error}`;
+                        } else {
+                            return 'Response received but unable to process.';
+                        }
+                }
+            } else if (result.project_name && result.status) {
+                return `• Project Name: ${result.project_name}\n• Status: ${result.status}`;
+            }
+            else if (result.task_name && result.status) {
+                    return `• Task Name: ${result.task_name}\n• Status: ${result.status}`;
+            } else if (result.message) {
+                // Convert paragraphs to bullet points if they contain multiple sentences
+                if (result.message.includes('.') && result.message.split('.').length > 2) {
+                    const sentences = result.message.split('.').filter(s => s.trim().length > 0);
+                    if (sentences.length > 1) {
+                        return sentences.map(s => `• ${s.trim()}`).join('\n');
+                    }
+                }
+                return result.message;
+            } else if (result.error) {
+                return `Error: ${result.error}`;
+            } else if (Array.isArray(result)) {
+                let response = `Results:\n`;
+                result.forEach(item => {
+                    response += `• ${formatResultItem(item)}\n`;
+                });
+                return response;
+            } else {
+                return 'No response from server.';
+            }
+        }
+        
+        // Enhanced animateText function to handle bullet points properly
+        function animateText(element, text, speed = 20) {
+            let index = 0;
+            element.textContent = '';
+            
+            // Check if text has bullet points
+            if (text.includes('•')) {
+                // Create a temporary div to handle HTML formatting
+                const tempDiv = document.createElement('div');
+                const paragraphs = text.split('\n');
+                
+                return new Promise((resolve) => {
+                    let paragraphIndex = 0;
+                    
+                    function addParagraph() {
+                        if (paragraphIndex < paragraphs.length) {
+                            const para = paragraphs[paragraphIndex];
+                            const paraElement = document.createElement('div');
+                            
+                            if (para.trim().startsWith('•')) {
+                                // This is a bullet point
+                                paraElement.style.display = 'flex';
+                                paraElement.style.marginBottom = '5px';
+                                paraElement.innerHTML = para;
+                            } else {
+                                paraElement.textContent = para;
+                            }
+                            
+                            element.appendChild(paraElement);
+                            paragraphIndex++;
+                            
+                            // Small delay between paragraphs
+                            setTimeout(addParagraph, speed * 10);
+                        } else {
+                            resolve();
+                        }
+                    }
+                    
+                    addParagraph();
+                });
+            } else {
+                // Original behavior for regular text
+                return new Promise((resolve) => {
+                    function addLetter() {
+                        if (index < text.length) {
+                            element.textContent += text.charAt(index);
+                            index++;
+                            setTimeout(addLetter, speed);
+                        } else {
+                            resolve();
+                        }
+                    }
+                    addLetter();
+                });
+            }
+        }
+        
+        // Helper function to format action titles
+        function formatActionTitle(action) {
+            if (!action) return 'Results';
+            
+            return action
+                .replace('list_', '')
+                .replace(/_/g, ' ')
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        }
+        
+        // Helper function to format result items
+        function formatResultItem(item) {
+            if (typeof item === 'string') return item;
+            
+            let formattedText = '';
+            for (const [key, value] of Object.entries(item)) {
+                const formattedKey = key.replace(/_/g, ' ').charAt(0).toUpperCase() + key.replace(/_/g, ' ').slice(1);
+                formattedText += `${formattedKey}: ${value}, `;
+            }
+            
+            return formattedText.slice(0, -2); // Remove trailing comma and space
+        }
+        
+        // Toggle profile dropdown visibility
+        function toggleProfileDropdown() {
+            const dropdown = document.getElementById('profileDropdown');
+            dropdown.classList.toggle('show');
+            
+            // If opening the dropdown, fetch user data
+            if (dropdown.classList.contains('show')) {
+                fetchUserProfile();
+            }
+        }
+        
+        // Close dropdown when clicking outside
+        window.onclick = function(event) {
+            if (!event.target.matches('.profile-icon') && !event.target.closest('.profile-dropdown')) {
+                const dropdown = document.getElementById('profileDropdown');
+                if (dropdown.classList.contains('show')) {
+                    dropdown.classList.remove('show');
+                }
+            }
+        }
+        
+        // Fetch user profile data from backend
+        async function fetchUserProfile() {
+            try {
+                const response = await fetch('/api/user-profile');
+                const userData = await response.json();
+        
+                if (userData && userData.success) {
+                    updateProfileUI(userData.user);
+                    currentUser = userData.user;
+                } else {
+                    console.error("Failed to fetch user profile data");
+                    // Use demo data as fallback
+                    updateProfileUI({
+                        username: "Demo User",
+                        id: "USR123456",
+                        role: "Project Manager",
+                        email: "demo@example.com"
+                    });
+                }
+            } catch (error) {
+                console.error("Error fetching user profile:", error);
+                // Use demo data as fallback
+                updateProfileUI({
+                    username: "Demo User",
+                    id: "USR123456",
+                    role: "Project Manager",
+                    email: "demo@example.com"
+                });
+            }
+        }
+        
+        // Update profile UI with user data
+        function updateProfileUI(user) {
+            document.getElementById('profileName').textContent = user.username || "Unknown User";
+            document.getElementById('profileUserId').textContent = user.id || "N/A";
+            document.getElementById('profileUsername').textContent = user.username || "N/A";
+            document.getElementById('profileRole').textContent = user.role || "N/A";
+            document.getElementById('profileEmail').textContent = user.email || "N/A";
+        
+            // Update avatar with first letter of username
+            const avatarElement = document.getElementById('profileAvatar');
+            const iconElement = document.getElementById('profileIcon');
+        
+            const firstLetter = (user.username || "U").charAt(0).toUpperCase();
+            avatarElement.textContent = firstLetter;
+            iconElement.textContent = firstLetter;
+        }
+        
+        // Logout functions
+        function showLogoutConfirmation() {
+            document.getElementById('logoutModal').style.display = 'block';
+        }
+        
+        function hideLogoutConfirmation() {
+            document.getElementById('logoutModal').style.display = 'none';
+        }
+        
+        async function performLogout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+        
+                if (response.ok) {
+                    localStorage.removeItem('isAuthenticated');
+                    window.location.href = 'login.html';
+                } else {
+                    alert('Failed to log out. Please try again.');
+                    hideLogoutConfirmation();
+                }
+            } catch (error) {
+                console.error("Logout error:", error);
+                alert('An error occurred while logging out.');
+                hideLogoutConfirmation();
+            }
+        }
+        
+        // Check authentication status on page load
+        window.onload = async function () {
+            try {
+                const response = await fetch('/api/check-auth');
+                const data = await response.json();
+        
+                if (!data.authenticated) {
+                    // For demo purposes, we'll still show the interface
+                    // Uncomment the following lines in production:
+                    // localStorage.removeItem('isAuthenticated');
+                    // window.location.href = 'login.html';
+                    console.log('Authentication check failed, but showing interface for demo');
+                }
+        
+                // Initialize chart with demo data if API is not available
+                fetchAndRenderChart();
+        
+                // Fetch initial user data
+                fetchUserProfile();
+        
+            } catch (error) {
+                console.error("Auth check error:", error);
+                console.log('Continuing with demo mode due to auth check error');
+        
+            }
+        };
+</script>
+</body>
+</html>
