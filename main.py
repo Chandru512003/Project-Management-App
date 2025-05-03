@@ -12,8 +12,7 @@ app = Flask(__name__, static_folder='static')
 app.secret_key = secrets.token_hex(16)  # More secure random secret key
 
 # Configure Gemini API
-GEMINI_API_KEY = creds.api_key
-genai.configure(api_key=GEMINI_API_KEY)
+genai.configure(api_key=creds.api_key)
 
 # Database connection function
 def get_db_connection():
