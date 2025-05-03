@@ -23,9 +23,9 @@ def get_db_connection():
     try:
         return mysql.connector.connect(
             host="https://php-myadmin.net/index.php",        # Replace with your actual host
-            user="chandru5123",               # Your database username
-            password="Chandru@12345",          # Your DB password
-            database="project_management"
+            user="if0_38895579",               # Your database username
+            password="YuFL0C2dugO",          # Your DB password
+            database="if0_38895579_project_management"
         )
     except Error as e:
         print(f"Database Connection Error: {e}")
