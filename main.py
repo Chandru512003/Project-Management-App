@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for
-import pyodbc
+import mysql.connector
+from mysql.connector import Error
 import google.generativeai as genai
 import os
 import secrets
@@ -17,16 +18,16 @@ if not GEMINI_API_KEY:
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Database connection function
+
 def get_db_connection():
     try:
-        return pyodbc.connect(
-            "DRIVER={ODBC Driver 17 for SQL Server};"
-            "SERVER=CHANDRU-PC;"  # Replace with your server name
-            "DATABASE=project_management_1;"  # Replace with your database name
-            "Trusted_Connection=yes;"
+        return mysql.connector.connect(
+            host="https://php-myadmin.net/index.php",        # Replace with your actual host
+            user="chandru5123",               # Your database username
+            password="Chandru@12345",          # Your DB password
+            database="project_management"
         )
-    except Exception as e:
+    except Error as e:
         print(f"Database Connection Error: {e}")
         raise
 
