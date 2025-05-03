@@ -3,7 +3,7 @@ import pyodbc
 import google.generativeai as genai
 import os
 import secrets
-from functools import
+from functools import wraps
 import creds
 import re
 from werkzeug.security import generate_password_hash, check_password_hash
