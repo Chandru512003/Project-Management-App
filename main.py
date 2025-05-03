@@ -4,15 +4,18 @@ import google.generativeai as genai
 import os
 import secrets
 from functools import wraps
-import creds
 import re
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__, static_folder='static')
-app.secret_key = secrets.token_hex(16)  # More secure random secret key
+app.secret_key = secrets.token_hex(16)
 
-# Configure Gemini API
-genai.configure(api_key=creds.api_key)
+# Configure Gemini API using environment variable
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise ValueError("Missing GEMINI_API_KEY environment variable")
+
+genai.configure(api_key=GEMINI_API_KEY)
 
 # Database connection function
 def get_db_connection():
