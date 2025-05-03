@@ -3,7 +3,8 @@ import pyodbc
 import google.generativeai as genai
 import os
 import secrets
-from functools import wraps
+from functools import
+import creds
 import re
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -11,7 +12,7 @@ app = Flask(__name__, static_folder='static')
 app.secret_key = secrets.token_hex(16)  # More secure random secret key
 
 # Configure Gemini API
-GEMINI_API_KEY = "AIzaSyC3udFYipjaUB7tpICypbMNEq4fhLB00Jw"
+GEMINI_API_KEY = creds.api_key
 genai.configure(api_key=GEMINI_API_KEY)
 
 # Database connection function
