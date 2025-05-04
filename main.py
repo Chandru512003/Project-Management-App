@@ -124,7 +124,6 @@ def user_has_access_to_task(user_id, role, task_id, conn=None):
     finally:
         if close_conn and conn:
             conn.close()
-
 @app.route('/api/register', methods=['POST'])
 def api_register():
     try:
@@ -145,29 +144,30 @@ def api_register():
             cursor = conn.cursor()
 
             # Check if username already exists
-            cursor.execute(" USE sql12776862; SELECT COUNT(*) FROM Users WHERE username = %s", (username,))
+            cursor.execute("SELECT COUNT(*) FROM Users WHERE username = %s", (username,))
             if cursor.fetchone()[0] > 0:
                 return jsonify({"error": "Username already exists"}), 409
 
             # Check if email already exists
-            cursor.execute(" USE sql12776862; SELECT COUNT(*) FROM Users WHERE email = %s", (email,))
+            cursor.execute("SELECT COUNT(*) FROM Users WHERE email = %s", (email,))
             if cursor.fetchone()[0] > 0:
                 return jsonify({"error": "Email already exists"}), 409
 
             # Hash the password
             password_hash = generate_password_hash(password)
 
-            # Insert new user with hashed password
+            # Insert new user with hashed password - FIXED: removed OUTPUT INSERTED syntax
             cursor.execute("""
-                        USE sql12776862;
                 INSERT INTO Users (username, email, role, password_hash, security, answer)
-                OUTPUT INSERTED.user_id
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (username, email, role, password_hash, security, answer))
-
-            # Get the newly created user's ID
-            user_id = cursor.fetchone()[0]
+            
+            # Commit to save the insert
             conn.commit()
+            
+            # Get the newly created user's ID - using MySQL's LAST_INSERT_ID()
+            cursor.execute("SELECT LAST_INSERT_ID()")
+            user_id = cursor.fetchone()[0]
 
             # Auto-login the user by setting session data
             session['user_id'] = user_id
