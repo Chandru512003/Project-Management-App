@@ -13,7 +13,6 @@ app.secret_key = secrets.token_hex(16)
 
 # Configure Gemini API using environment variable
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-DB_Password = os.environ.get("DB_Password")
 if not GEMINI_API_KEY:
     raise ValueError("Missing GEMINI_API_KEY environment variable")
 
@@ -22,11 +21,12 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 # Update the database connection function to use mysql.connector
 def get_db_connection():
+    DB_Password = os.environ.get("DB_Password")
     try:
         return mysql.connector.connect(
             host="sql12.freesqldatabase.com",        # Replace with your actual host
             user="sql12776862",               # Your database username
-            password="DB_Password",          # Your DB password
+            password=DB_Password,          # Your DB password
             database="sql12776862",
             port= 3306
         )
@@ -165,10 +165,10 @@ def api_register():
                 INSERT INTO Users (username, email, role, password_hash, security, answer)
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (username, email, role, password_hash, security, answer))
-            
+
             # Commit to save the insert
             conn.commit()
-            
+
             # Get the newly created user's ID
             user_id = cursor.lastrowid
 
