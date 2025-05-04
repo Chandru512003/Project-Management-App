@@ -59,7 +59,6 @@ def user_has_access_to_project(user_id, role, project_id, conn=None):
 
         # Check if user created the project
         cursor.execute("""
-    USE sql12776862;
     SELECT COUNT(*) FROM Projects
     WHERE project_id = %s AND created_by = %s
 """, (project_id, user_id))
@@ -68,7 +67,6 @@ def user_has_access_to_project(user_id, role, project_id, conn=None):
 
         # Check if user is assigned to any task in the project
         cursor.execute("""
-    USE sql12776862;
     SELECT COUNT(*) FROM Tasks
     WHERE project_id = %s AND assigned_to = %s
 """, (project_id, user_id))
@@ -98,7 +96,6 @@ def user_has_access_to_task(user_id, role, task_id, conn=None):
         cursor = conn.cursor()
         # Check if the task is assigned to the user
         cursor.execute("""
-    USE sql12776862;
     SELECT COUNT(*) FROM Tasks
     WHERE task_id = %s AND assigned_to = %s
 """, (task_id, user_id))
@@ -107,7 +104,6 @@ def user_has_access_to_task(user_id, role, task_id, conn=None):
 
         # Check if the task belongs to a project the user has access to
         cursor.execute("""
-    USE sql12776862;
     SELECT COUNT(*) FROM Projects p
     INNER JOIN Tasks t ON p.project_id = t.project_id
     WHERE t.task_id = %s AND (p.created_by = %s OR EXISTS (
@@ -714,7 +710,6 @@ def get_project_status():
         # For admin, show all projects
         if role.lower() == 'admin':
             cursor.execute("""
-    USE sql12776862;
     SELECT status, COUNT(*) AS count
     FROM Projects
     GROUP BY status
@@ -735,7 +730,6 @@ def get_project_status():
 
             # First, get projects created by the user
             cursor.execute("""
-    USE sql12776862;
     SELECT status
     FROM Projects
     WHERE created_by = %s
@@ -748,7 +742,6 @@ def get_project_status():
 
             # Second, get projects the user is assigned to via tasks (need to avoid double counting)
             cursor.execute("""
-    USE sql12776862;
     SELECT p.project_id, p.status
     FROM Projects p
     INNER JOIN Tasks t ON p.project_id = t.project_id
@@ -782,7 +775,7 @@ def get_user_accessible_projects(user_id, role):
     try:
         # For admin, return all projects
         if role.lower() == 'admin':
-            cursor.execute("USE sql12776862; SELECT project_id, project_name FROM Projects")
+            cursor.execute("SELECT project_id, project_name FROM Projects")
             rows = cursor.fetchall()
             return [{"project_id": row[0], "project_name": row[1]} for row in rows]
         else:
@@ -791,7 +784,6 @@ def get_user_accessible_projects(user_id, role):
 
             # Get projects created by user
             cursor.execute("""
-    USE sql12776862;
     SELECT project_id, project_name FROM Projects WHERE created_by = %s
 """, (user_id,))
             for row in cursor.fetchall():
@@ -800,7 +792,6 @@ def get_user_accessible_projects(user_id, role):
 
             # Get projects user is assigned to via tasks
             cursor.execute("""
-    USE sql12776862;
     SELECT DISTINCT p.project_id, p.project_name
     FROM Projects p
     INNER JOIN Tasks t ON p.project_id = t.project_id
@@ -937,10 +928,8 @@ def insert_project(user_id, data):
     cursor = conn.cursor()
     try:
         cursor.execute("""
-    USE sql12776862;
     INSERT INTO Projects (project_name, description, start_date, end_date, status, created_by)
-    VALUES (%s, %s, %s, %s, %s, %s)
-""", (data['project_name'], data['description'], data['start_date'], data['end_date'], 'Pending', user_id))
+    VALUES (%s, %s, %s, %s, %s, %s)""", (data['project_name'], data['description'], data['start_date'], data['end_date'], 'Pending', user_id))
         conn.commit()
         log_activity(user_id, "Project_Creation", f"Created project: {data['project_name']}")
         return jsonify({"message": "Project added successfully!"}), 200
@@ -982,7 +971,7 @@ def handle_add_task_session(user_id, query, role):
             # Fetch the username for the provided user_id
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("USE sql12776862; SELECT username FROM Users WHERE user_id = %s", (assigned_to,))
+            cursor.execute("SELECT username FROM Users WHERE user_id = %s", (assigned_to,))
             result = cursor.fetchone()
             cursor.close()
             conn.close()
@@ -1070,7 +1059,6 @@ def insert_task(user_id, data):
     cursor = conn.cursor()
     try:
         cursor.execute("""
-    USE sql12776862;
     INSERT INTO Tasks (
         task_name, description, assigned_to, project_id, due_date, status, priority
     ) VALUES (%s, %s, %s, %s, %s, 'Pending', %s)
@@ -1094,13 +1082,12 @@ def get_pending_projects(user_id, role):
     try:
         # For admin, show all pending projects
         if role.lower() == 'admin':
-            cursor.execute("USE sql12776862; SELECT project_id, project_name, start_date, end_date, status FROM Projects WHERE status = 'Pending'")
+            cursor.execute("SELECT project_id, project_name, start_date, end_date, status FROM Projects WHERE status = 'Pending'")
             rows = cursor.fetchall()
             projects = [{"project_id": row[0], "project_name": row[1], "start_date": row[2], "end_date": row[3], "status": row[4]} for row in rows]
         else:
             # Get projects the user created with 'Pending' status
             cursor.execute("""
-    USE sql12776862;
     SELECT project_id, project_name, start_date, end_date, status
     FROM Projects
     WHERE status = 'Pending' AND created_by = %s
@@ -1114,7 +1101,6 @@ def get_pending_projects(user_id, role):
 
             # Get 'Pending' projects the user is assigned to via tasks
             cursor.execute("""
-    USE sql12776862;
     SELECT DISTINCT p.project_id, p.project_name, p.start_date, p.end_date, p.status
     FROM Projects p
     INNER JOIN Tasks t ON p.project_id = t.project_id
@@ -1145,13 +1131,12 @@ def get_completed_projects(user_id, role):
     try:
         # For admin, show all completed projects
         if role.lower() == 'admin':
-            cursor.execute("USE sql12776862; SELECT project_id, project_name, start_date, end_date, status FROM Projects WHERE status = 'Completed'")
+            cursor.execute("SELECT project_id, project_name, start_date, end_date, status FROM Projects WHERE status = 'Completed'")
             rows = cursor.fetchall()
             projects = [{"project_id": row[0], "project_name": row[1], "start_date": row[2], "end_date": row[3], "status": row[4]} for row in rows]
         else:
             # Get projects the user created with 'Completed' status
             cursor.execute("""
-    USE sql12776862;
     SELECT project_id, project_name, start_date, end_date, status
     FROM Projects
     WHERE status = 'Completed' AND created_by = %s
@@ -1165,7 +1150,6 @@ def get_completed_projects(user_id, role):
 
             # Get 'Completed' projects the user is assigned to via tasks
             cursor.execute("""
-    USE sql12776862;
     SELECT DISTINCT p.project_id, p.project_name, p.start_date, p.end_date, p.status
     FROM Projects p
     INNER JOIN Tasks t ON p.project_id = t.project_id
@@ -1196,13 +1180,12 @@ def list_all_projects_status(user_id, role):
     try:
         # For admin, show status of all projects
         if role.lower() == 'admin':
-            cursor.execute("USE sql12776862; SELECT project_name, status FROM Projects")
+            cursor.execute("SELECT project_name, status FROM Projects")
             rows = cursor.fetchall()
             projects = [{"project_name": row[0], "status": row[1]} for row in rows]
         else:
             # Get projects the user created
             cursor.execute("""
-    USE sql12776862;
     SELECT project_name, status
     FROM Projects
     WHERE created_by = %s
@@ -1216,7 +1199,6 @@ def list_all_projects_status(user_id, role):
 
             # Get projects the user is assigned to via tasks
             cursor.execute("""
-    USE sql12776862;
     SELECT DISTINCT p.project_name, p.status
     FROM Projects p
     INNER JOIN Tasks t ON p.project_id = t.project_id
@@ -1247,7 +1229,7 @@ def get_project_status_by_name(project_name, user_id, role):
         print(f"Querying project: '{project_name}'")
 
         # Fix parameter binding by using a tuple
-        cursor.execute("USE sql12776862; SELECT project_id, status FROM Projects WHERE project_name = %s", (project_name,))
+        cursor.execute("SELECT project_id, status FROM Projects WHERE project_name = %s", (project_name,))
         result = cursor.fetchone()
 
         if not result:
@@ -1283,13 +1265,12 @@ def get_pending_tasks(user_id, role):
     try:
         # For admin, show all pending tasks
         if role.lower() == 'admin':
-            cursor.execute("USE sql12776862; SELECT task_id, task_name, description, due_date, priority FROM Tasks WHERE status = 'Pending'")
+            cursor.execute("SELECT task_id, task_name, description, due_date, priority FROM Tasks WHERE status = 'Pending'")
             rows = cursor.fetchall()
             tasks = [{"task_id": row[0], "task_name": row[1], "description": row[2], "due_date": row[3], "priority": row[4]} for row in rows]
         else:
             # Get tasks assigned to the user with 'Pending' status
             cursor.execute("""
-    USE sql12776862;
     SELECT task_id, task_name, description, due_date, priority
     FROM Tasks
     WHERE status = 'Pending' AND assigned_to = %s
@@ -1314,13 +1295,12 @@ def get_completed_tasks(user_id, role):
     try:
         # For admin, show all completed tasks
         if role.lower() == 'admin':
-            cursor.execute("USE sql12776862; SELECT task_id, task_name, description, due_date, priority FROM Tasks WHERE status = 'Completed'")
+            cursor.execute("SELECT task_id, task_name, description, due_date, priority FROM Tasks WHERE status = 'Completed'")
             rows = cursor.fetchall()
             tasks = [{"task_id": row[0], "task_name": row[1], "description": row[2], "due_date": row[3], "priority": row[4]} for row in rows]
         else:
             # Get tasks assigned to the user with 'Completed' status
             cursor.execute("""
-    USE sql12776862;
     SELECT task_id, task_name, description, due_date, priority
     FROM Tasks
     WHERE status = 'Completed' AND assigned_to = %s
@@ -1346,13 +1326,12 @@ def list_all_tasks_status(user_id, role):
     try:
         # For admin, show status of all tasks
         if role.lower() == 'admin':
-            cursor.execute("USE sql12776862; SELECT task_name, status FROM Tasks")
+            cursor.execute("SELECT task_name, status FROM Tasks")
             rows = cursor.fetchall()
             tasks = [{"task_name": row[0], "status": row[1]} for row in rows]
         else:
             # Get tasks assigned to the user
             cursor.execute("""
-    USE sql12776862;
     SELECT task_name, status
     FROM Tasks
     WHERE assigned_to = %s
@@ -1377,13 +1356,12 @@ def get_low_priority_tasks(user_id, role):
     try:
         # For admin, show all low-priority tasks
         if role.lower() == 'admin':
-            cursor.execute("USE sql12776862; SELECT task_id, task_name, description, due_date, priority FROM Tasks WHERE priority = 'Low'")
+            cursor.execute("SELECT task_id, task_name, description, due_date, priority FROM Tasks WHERE priority = 'Low'")
             rows = cursor.fetchall()
             tasks = [{"task_id": row[0], "task_name": row[1], "description": row[2], "due_date": row[3], "priority": row[4]} for row in rows]
         else:
             # Get low-priority tasks assigned to the user
             cursor.execute("""
-    USE sql12776862;
     SELECT task_id, task_name, description, due_date, priority
     FROM Tasks
     WHERE priority = 'Low' AND assigned_to = %s
@@ -1408,13 +1386,12 @@ def get_medium_priority_tasks(user_id, role):
     try:
         # For admin, show all medium-priority tasks
         if role.lower() == 'admin':
-            cursor.execute("USE sql12776862; SELECT task_id, task_name, description, due_date, priority FROM Tasks WHERE priority = 'Medium'")
+            cursor.execute("SELECT task_id, task_name, description, due_date, priority FROM Tasks WHERE priority = 'Medium'")
             rows = cursor.fetchall()
             tasks = [{"task_id": row[0], "task_name": row[1], "description": row[2], "due_date": row[3], "priority": row[4]} for row in rows]
         else:
             # Get medium-priority tasks assigned to the user
             cursor.execute("""
-    USE sql12776862;
     SELECT task_id, task_name, description, due_date, priority
     FROM Tasks
     WHERE priority = 'Medium' AND assigned_to = %s
@@ -1439,13 +1416,12 @@ def get_high_priority_tasks(user_id, role):
     try:
         # For admin, show all high-priority tasks
         if role.lower() == 'admin':
-            cursor.execute("USE sql12776862; SELECT task_id, task_name, description, due_date, priority FROM Tasks WHERE priority = 'High'")
+            cursor.execute("SELECT task_id, task_name, description, due_date, priority FROM Tasks WHERE priority = 'High'")
             rows = cursor.fetchall()
             tasks = [{"task_id": row[0], "task_name": row[1], "description": row[2], "due_date": row[3], "priority": row[4]} for row in rows]
         else:
             # Get high-priority tasks assigned to the user
             cursor.execute("""
-    USE sql12776862;
     SELECT task_id, task_name, description, due_date, priority
     FROM Tasks
     WHERE priority = 'High' AND assigned_to = %s
@@ -1471,7 +1447,7 @@ def get_task_status_by_name(task_name, user_id, role):
         print(f"Querying task: '{task_name}'")
 
         # Fix parameter binding by using a tuple
-        cursor.execute("USE sql12776862; SELECT task_id, status FROM Tasks WHERE task_name = %s", (task_name,))
+        cursor.execute("SELECT task_id, status FROM Tasks WHERE task_name = %s", (task_name,))
         result = cursor.fetchone()
 
         if not result:
@@ -1504,7 +1480,7 @@ def update_task_status(data, user_id, role):
     cursor = conn.cursor()
     try:
         # Get project_id from project_name
-        cursor.execute("USE sql12776862; SELECT task_id FROM Tasks WHERE task_name = %s", (data['task_name'],))
+        cursor.execute("SELECT task_id FROM Tasks WHERE task_name = %s", (data['task_name'],))
         task_result = cursor.fetchone()
 
         if not task_result:
@@ -1518,7 +1494,6 @@ def update_task_status(data, user_id, role):
 
         # Check if the task exists in this project
         cursor.execute("""
-    USE sql12776862;
     SELECT COUNT(*) FROM Tasks
     WHERE task_name = %s
 """, (data['task_name'],))
@@ -1528,7 +1503,6 @@ def update_task_status(data, user_id, role):
 
         # Update the task status
         cursor.execute("""
-    USE sql12776862;
     UPDATE Tasks SET status = %s WHERE task_name = %s
 """, (data['new_status'], data['task_name']))
 
@@ -1570,7 +1544,6 @@ def update_project_status(data, user_id, role):
 
         # Update the project status
         cursor.execute("""
-    USE sql12776862;
     UPDATE Projects SET status = %s WHERE project_id = %s
 """, (new_status, project_id))
 
@@ -1599,7 +1572,6 @@ def log_activity(user_id, activity_type, description):
     cursor = conn.cursor()
     try:
         cursor.execute("""
-    USE sql12776862;
     INSERT INTO Activity_Log (user_id, activity_type, description)
     VALUES (%s, %s, %s)
 """, (user_id, activity_type, description))
