@@ -1530,7 +1530,7 @@ def update_project_status(data, user_id, role):
             return {"error": "Both 'project_name' and 'new_status' must be provided"}, 400
 
         # Get project_id from project_name
-        cursor.execute("USE sql12776862; SELECT project_id FROM Projects WHERE project_name = %s", (project_name,))
+        cursor.execute("SELECT project_id FROM Projects WHERE project_name = %s", (project_name,))
         project_result = cursor.fetchone()
 
         if not project_result:
