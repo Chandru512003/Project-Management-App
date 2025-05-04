@@ -19,17 +19,23 @@ if not GEMINI_API_KEY:
 genai.configure(api_key=GEMINI_API_KEY)
 
 
+# Update the database connection function to use mysql.connector
 def get_db_connection():
+    """
+    Creates a connection to the MySQL database using mysql.connector
+    Returns the connection object
+    """
     try:
-        return mysql.connector.connect(
-            host="sql12.freesqldatabase.com",        # Replace with your actual host
-            user="sql12776862",               # Your database username
-            password="M42wj1fStc",          # Your DB password
-            database="sql12776862",
-            port= 3306
+        conn = mysql.connector.connect(
+            host=os.environ.get('DB_HOST', 'ql12.freesqldatabase.com'),
+            user=os.environ.get('DB_USER', 'sql12776862'),
+            password=os.environ.get('DB_PASSWORD', ' M42wj1fStc'),  # Replace with actual password or env variable
+            database=os.environ.get('DB_NAME', 'sql12776862'),
+            port=int(os.environ.get('DB_PORT', '3306'))
         )
-    except Error as e:
-        print(f"Database Connection Error: {e}")
+        return conn
+    except mysql.connector.Error as e:
+        print(f"Error connecting to MySQL database: {e}")
         raise
 
 # Authentication middleware
@@ -124,6 +130,8 @@ def user_has_access_to_task(user_id, role, task_id, conn=None):
     finally:
         if close_conn and conn:
             conn.close()
+
+#API to Register
 @app.route('/api/register', methods=['POST'])
 def api_register():
     try:
@@ -141,33 +149,32 @@ def api_register():
 
         try:
             conn = get_db_connection()
-            cursor = conn.cursor()
+            cursor = conn.cursor(buffered=True)  # Using buffered cursor for MySQL
 
             # Check if username already exists
-            cursor.execute("USE sql12776862; SELECT COUNT(*) FROM Users WHERE username = %s", (username,))
+            cursor.execute("SELECT COUNT(*) FROM Users WHERE username = %s", (username,))
             if cursor.fetchone()[0] > 0:
                 return jsonify({"error": "Username already exists"}), 409
 
             # Check if email already exists
-            cursor.execute("USE sql12776862; SELECT COUNT(*) FROM Users WHERE email = %s", (email,))
+            cursor.execute("SELECT COUNT(*) FROM Users WHERE email = %s", (email,))
             if cursor.fetchone()[0] > 0:
                 return jsonify({"error": "Email already exists"}), 409
 
             # Hash the password
             password_hash = generate_password_hash(password)
 
-            # Insert new user with hashed password - FIXED: removed OUTPUT INSERTED syntax
+            # Insert new user with hashed password
             cursor.execute("""
-    INSERT INTO Users (username, email, role, password_hash, security, answer)
-    VALUES (%s, %s, %s, %s, %s, %s)
-""", (username, email, role, password_hash, security, answer))
+                INSERT INTO Users (username, email, role, password_hash, security, answer)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (username, email, role, password_hash, security, answer))
             
             # Commit to save the insert
             conn.commit()
             
-            # Get the newly created user's ID - using MySQL's LAST_INSERT_ID()
-            cursor.execute("SELECT LAST_INSERT_ID()")
-            user_id = cursor.fetchone()[0]
+            # Get the newly created user's ID
+            user_id = cursor.lastrowid
 
             # Auto-login the user by setting session data
             session['user_id'] = user_id
@@ -207,7 +214,7 @@ def api_register():
         print(f"General Registration Error: {e}")
         return jsonify({"error": "An unexpected error occurred"}), 500
 
-# User login route - Updated to include email for profile display
+# User login route
 @app.route('/api/login', methods=['POST'])
 def api_login():
     data = request.json
@@ -220,15 +227,14 @@ def api_login():
 
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(buffered=True)  # Using buffered cursor for MySQL
 
         # First check if user_id and username match and get email
         cursor.execute("""
-    USE sql12776862;
-    SELECT user_id, username, password_hash, role, email
-    FROM Users
-    WHERE user_id = %s AND username = %s
-""", (user_id, username))
+            SELECT user_id, username, password_hash, role, email
+            FROM Users
+            WHERE user_id = %s AND username = %s
+        """, (user_id, username))
 
         user = cursor.fetchone()
 
@@ -255,12 +261,11 @@ def api_login():
         session['role'] = user[3]
         session['email'] = user[4]  # Store email in session
 
-        # Log activity (assuming this function exists)
+        # Log activity
         try:
             log_activity(user[0], "User_Login", f"User {username} logged in")
-        except:
-            # If log_activity function is not defined, ignore the error
-            pass
+        except Exception as log_error:
+            print(f"Error logging activity: {log_error}")
 
         return jsonify({
             "message": "Login successful",
@@ -276,8 +281,10 @@ def api_login():
         print(f"Login Error: {e}")
         return jsonify({"error": f"Login failed: {str(e)}"}), 500
     finally:
-        cursor.close()
-        conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 # Verify identity endpoint
 @app.route('/api/verify-identity', methods=['POST'])
@@ -293,15 +300,15 @@ def api_verify_identity():
     
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(buffered=True)  # Using buffered cursor for MySQL
         
         # Fetch user data based on username and email (case-insensitive match)
+        # MySQL LOWER() function for case-insensitive matching
         cursor.execute("""
-    USE sql12776862;
-    SELECT user_id, security, answer
-    FROM Users
-    WHERE LOWER(username) = LOWER(%s) AND LOWER(email) = LOWER(%s)
-""", (username, email))
+            SELECT user_id, security, answer
+            FROM Users
+            WHERE LOWER(username) = LOWER(%s) AND LOWER(email) = LOWER(%s)
+        """, (username, email))
         
         user = cursor.fetchone()
         
@@ -342,10 +349,10 @@ def api_forgot_password():
     
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(buffered=True)  # Using buffered cursor for MySQL
         
         # Get username for activity log
-        cursor.execute("USE sql12776862; SELECT username FROM Users WHERE user_id = %s", (user_id,))
+        cursor.execute("SELECT username FROM Users WHERE user_id = %s", (user_id,))
         user = cursor.fetchone()
         if not user:
             return jsonify({"error": "User not found."}), 404
@@ -356,12 +363,10 @@ def api_forgot_password():
         new_password_hash = generate_password_hash(new_password)
         
         cursor.execute("""
-    USE sql12776862;
-    UPDATE Users
-    SET password_hash = %s
-    WHERE user_id = %s
-""", (new_password_hash, user_id))
-
+            UPDATE Users
+            SET password_hash = %s
+            WHERE user_id = %s
+        """, (new_password_hash, user_id))
         
         conn.commit()
         
@@ -382,24 +387,7 @@ def api_forgot_password():
         if 'conn' in locals() and conn:
             conn.close()
 
-# CORS handlers for preflight requests
-@app.route('/api/verify-identity', methods=['OPTIONS'])
-def handle_options_verify_identity():
-    response = make_response()
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-    response.headers.add('Access-Control-Allow-Methods', 'POST')
-    return response
-
-@app.route('/api/forgot-password', methods=['OPTIONS'])
-def handle_options_forgot_password():
-    response = make_response()
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-    response.headers.add('Access-Control-Allow-Methods', 'POST')
-    return response
-
-# New endpoint to fetch user profile data
+# User profile endpoint
 @app.route('/api/user-profile', methods=['GET'])
 def get_user_profile():
     # Check if user is logged in
@@ -408,16 +396,14 @@ def get_user_profile():
 
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(buffered=True)  # Using buffered cursor for MySQL
 
         # Get user data from database to ensure it's up-to-date
         cursor.execute("""
-    USE sql12776862;
-    SELECT user_id, username, role, email
-    FROM Users
-    WHERE user_id = %s
-""", (session['user_id'],))
-
+            SELECT user_id, username, role, email
+            FROM Users
+            WHERE user_id = %s
+        """, (session['user_id'],))
 
         user = cursor.fetchone()
 
@@ -438,8 +424,10 @@ def get_user_profile():
         print(f"Profile Error: {e}")
         return jsonify({"error": f"Failed to retrieve profile: {str(e)}", "success": False}), 500
     finally:
-        cursor.close()
-        conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 # Check authentication status endpoint
 @app.route('/api/check-auth', methods=['GET'])
@@ -456,17 +444,19 @@ def check_auth():
     else:
         return jsonify({"authenticated": False}), 401
 
-# user logout page
+# User logout endpoint
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
     if 'user_id' in session:
         user_id = session['user_id']
         username = session.get('username', '')
         session.clear()
-        log_activity(user_id, "User_Logout", f"User {username} logged out")
+        try:
+            log_activity(user_id, "User_Logout", f"User {username} logged out")
+        except Exception as e:
+            print(f"Error logging logout: {e}")
         return jsonify({"message": "Logout successful"}), 200
     return jsonify({"message": "Not logged in"}), 200
-
 
 # Serve the registration page
 @app.route('/register')
