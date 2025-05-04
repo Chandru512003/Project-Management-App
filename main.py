@@ -22,10 +22,10 @@ genai.configure(api_key=GEMINI_API_KEY)
 def get_db_connection():
     try:
         return mysql.connector.connect(
-            host="sql12.freesqldatabase.com",        # Replace with your actual host
-            user="sql12776861",               # Your database username
-            password=" lrvslJicvb",          # Your DB password
-            database="sql12776861"
+            host="https://php-myadmin.net/index.php",        # Replace with your actual host
+            user="if0_38895579",               # Your database username
+            password="YuFL0C2dugO",          # Your DB password
+            database="if0_38895579_project_management"
         )
     except Error as e:
         print(f"Database Connection Error: {e}")
