@@ -959,12 +959,10 @@ def insert_project(user_id, data):
 
 # Function to handle the "Add a new task" session
 def handle_add_task_session(user_id, query, role):
-
     task_details = session.get("task_details", {})
 
     # Step 1: Collect task name
     if "task_name" not in task_details:
-        # Directly collect task name without using Gemini API
         if not query.strip():
             return jsonify({"error": "Task name cannot be empty."}), 400
         task_details["task_name"] = query.strip()
@@ -973,7 +971,6 @@ def handle_add_task_session(user_id, query, role):
 
     # Step 2: Collect task description
     elif "description" not in task_details:
-        # Directly collect task description without using Gemini API
         if not query.strip():
             return jsonify({"error": "Task description cannot be empty."}), 400
         task_details["description"] = query.strip()
@@ -985,7 +982,6 @@ def handle_add_task_session(user_id, query, role):
         try:
             assigned_to = int(query.strip())
 
-            # Fetch the username for the provided user_id
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT username FROM Users WHERE user_id = %s", (assigned_to,))
@@ -998,10 +994,9 @@ def handle_add_task_session(user_id, query, role):
 
             username = result[0]
             task_details["assigned_to"] = assigned_to
-            task_details["assigned_username"] = username  # Store username temporarily
+            task_details["assigned_username"] = username
             session["task_details"] = task_details
 
-            # Ask for confirmation explicitly
             return jsonify({
                 "message": f"You are assigning the task '{task_details['task_name']}' to '{username}'. Is this okay? Please reply with 'yes' or 'no'."
             }), 200
@@ -1011,14 +1006,12 @@ def handle_add_task_session(user_id, query, role):
 
     # Step 4: Handle confirmation
     elif "confirmation_received" not in task_details:
-        # Validate confirmation response
         normalized_query = query.strip().lower()
         if normalized_query == "yes":
             task_details["confirmation_received"] = True
             session["task_details"] = task_details
             return jsonify({"message": "Great! Now please provide the project ID this task belongs to."}), 200
         elif normalized_query == "no":
-            # Reset assigned_to and ask again
             task_details.pop("assigned_to", None)
             task_details.pop("assigned_username", None)
             session["task_details"] = task_details
@@ -1026,10 +1019,22 @@ def handle_add_task_session(user_id, query, role):
         else:
             return jsonify({"error": "Invalid response. Please reply with 'yes' or 'no'."}), 400
 
-    # Step 5: Collect project ID
+    # ✅ Step 5: Collect and validate project ID
     elif "project_id" not in task_details:
         try:
             project_id = int(query.strip())
+
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM Projects WHERE project_id = %s", (project_id,))
+            if not cursor.fetchone():
+                cursor.close()
+                conn.close()
+                return jsonify({"error": f"No project found with project_id {project_id}. Please enter a valid project ID."}), 400
+
+            cursor.close()
+            conn.close()
+
             task_details["project_id"] = project_id
             session["task_details"] = task_details
             return jsonify({"message": "Great! Now please provide the due date for the task (format: YYYY-MM-DD)."}), 200
@@ -1040,7 +1045,6 @@ def handle_add_task_session(user_id, query, role):
     elif "due_date" not in task_details:
         try:
             due_date = query.strip()
-            # Validate date format (YYYY-MM-DD)
             if not re.match(r"\d{4}-\d{2}-\d{2}", due_date):
                 raise ValueError("Invalid date format")
             task_details["due_date"] = due_date
@@ -1049,9 +1053,8 @@ def handle_add_task_session(user_id, query, role):
         except ValueError:
             return jsonify({"error": "Invalid date format. Please use YYYY-MM-DD."}), 400
 
-    # Step 7: Collect priority
+    # Step 7: Collect priority and insert task
     elif "priority" not in task_details:
-        # Directly collect priority without using Gemini API
         normalized_priority = query.strip().lower()
         priority_map = {
             "low": "Low",
@@ -1061,7 +1064,7 @@ def handle_add_task_session(user_id, query, role):
         if normalized_priority in priority_map:
             task_details["priority"] = priority_map[normalized_priority]
 
-            # Insert the task into the database
+            # Final step: insert into DB
             session.pop("in_session", None)
             session.pop("task_details", None)
             return insert_task(user_id, task_details)
