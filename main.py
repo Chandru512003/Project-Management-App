@@ -26,7 +26,7 @@ def get_db_connection():
             user="sql12776862",               # Your database username
             password="M42wj1fStc",          # Your DB password
             database="sql12776862",
-            port=
+            port= 3306
         )
     except Error as e:
         print(f"Database Connection Error: {e}")
