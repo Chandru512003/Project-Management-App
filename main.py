@@ -57,29 +57,30 @@ def user_has_access_to_project(user_id, role, project_id, conn=None):
     try:
         cursor = conn.cursor()
 
-        # Check if user created the project
+        # Check if the user is the creator of the project
         cursor.execute("""
-    SELECT COUNT(*) FROM Projects
-    WHERE project_id = %s AND created_by = %s
-""", (project_id, user_id))
-        if cursor.fetchone()[0] > 0:
+            SELECT 1 FROM Projects WHERE project_id = %s AND created_by = %s
+        """, (project_id, user_id))
+        if cursor.fetchone():
             return True
 
-        # Check if user is assigned to any task in the project
+        # Check if the user is assigned to any task in the project
         cursor.execute("""
-    SELECT COUNT(*) FROM Tasks
-    WHERE project_id = %s AND assigned_to = %s
-""", (project_id, user_id))
-        if cursor.fetchone()[0] > 0:
+            SELECT 1 FROM Tasks WHERE project_id = %s AND assigned_to = %s LIMIT 1
+        """, (project_id, user_id))
+        if cursor.fetchone():
             return True
 
         return False
+
     except Exception as e:
         print(f"Access check error: {e}")
         return False
+
     finally:
-        if close_conn and conn:
+        if close_conn:
             conn.close()
+
 
 # Helper function to check if a user has access to a task
 def user_has_access_to_task(user_id, role, task_id, conn=None):
@@ -94,23 +95,38 @@ def user_has_access_to_task(user_id, role, task_id, conn=None):
 
     try:
         cursor = conn.cursor()
-        # Check if the task is assigned to the user
+
+        # Check if the task is directly assigned to the user
         cursor.execute("""
-    SELECT COUNT(*) FROM Tasks
-    WHERE task_id = %s AND assigned_to = %s
-""", (task_id, user_id))
-        if cursor.fetchone()[0] > 0:
+            SELECT 1 FROM Tasks
+            WHERE task_id = %s AND assigned_to = %s
+            LIMIT 1
+        """, (task_id, user_id))
+        if cursor.fetchone():
             return True
 
-        # Check if the task belongs to a project the user has access to
+        # Check if the user created the project that the task belongs to
         cursor.execute("""
-    SELECT COUNT(*) FROM Projects p
-    INNER JOIN Tasks t ON p.project_id = t.project_id
-    WHERE t.task_id = %s AND (p.created_by = %s OR EXISTS (
-        SELECT 1 FROM Tasks WHERE project_id = p.project_id AND assigned_to = %s
-    ))
-""", (task_id, user_id, user_id))
-        if cursor.fetchone()[0] > 0:
+            SELECT 1
+            FROM Projects p
+            JOIN Tasks t ON p.project_id = t.project_id
+            WHERE t.task_id = %s AND p.created_by = %s
+            LIMIT 1
+        """, (task_id, user_id))
+        if cursor.fetchone():
+            return True
+
+        # Check if the user is assigned to any task in the same project
+        cursor.execute("""
+            SELECT 1
+            FROM Tasks t1
+            WHERE t1.project_id = (
+                SELECT t2.project_id FROM Tasks t2 WHERE t2.task_id = %s
+            )
+            AND t1.assigned_to = %s
+            LIMIT 1
+        """, (task_id, user_id))
+        if cursor.fetchone():
             return True
 
         return False
@@ -122,6 +138,7 @@ def user_has_access_to_task(user_id, role, task_id, conn=None):
     finally:
         if close_conn and conn:
             conn.close()
+
 
 #API to Register
 @app.route('/api/register', methods=['POST'])
@@ -1474,85 +1491,75 @@ def get_task_status_by_name(task_name, user_id, role):
     finally:
         conn.close()
 
-# Modified function to update the status of a task (with access check)
+# Function to update the status of a task (with access check)
 def update_task_status(data, user_id, role):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # Get project_id from project_name
-        cursor.execute("SELECT task_id FROM Tasks WHERE task_name = %s", (data['task_name'],))
+        task_name = data.get('task_name')
+        new_status = data.get('new_status')
+
+        if not task_name or not new_status:
+            return jsonify({"error": "Both 'task_name' and 'new_status' must be provided"}), 400
+
+        # Get project_id using task_name
+        cursor.execute("SELECT task_id, project_id FROM Tasks WHERE task_name = %s", (task_name,))
         task_result = cursor.fetchone()
 
         if not task_result:
             return jsonify({"error": "Task not found"}), 404
 
-        task_id = task_result[0]
+        task_id, project_id = task_result
 
-        # Check if user has access to this project
-        if not user_has_access_to_project(user_id, role, task_id, conn):
-            return jsonify({"error": "You do not have access to this Task"}), 403
+        # Check if user has access to the project
+        if not user_has_access_to_project(user_id, role, project_id, conn):
+            return jsonify({"error": "You do not have access to this task"}), 403
 
-        # Check if the task exists in this project
-        cursor.execute("""
-    SELECT COUNT(*) FROM Tasks
-    WHERE task_name = %s
-""", (data['task_name'],))
-
-        if cursor.fetchone()[0] == 0:
-            return jsonify({"error": "Task not found in this project"}), 404
-
-        # Update the task status
-        cursor.execute("""
-    UPDATE Tasks SET status = %s WHERE task_name = %s
-""", (data['new_status'], data['task_name']))
-
-
+        # Update task status
+        cursor.execute("UPDATE Tasks SET status = %s WHERE task_id = %s", (new_status, task_id))
         conn.commit()
-        log_activity(user_id, "Task_Update", f"Updated task '{data['task_name']}' status to {data['new_status']}")
-        return {"message": "Task status updated successfully!"}, 200
+
+        log_activity(user_id, "Task_Update", f"Updated task '{task_name}' status to '{new_status}'")
+        return {"message": f"Task '{task_name}' status updated successfully!"}, 200
+
     except Exception as e:
         print(f"Database Error: {e}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
+
     finally:
         conn.close()
+
 
 # Function to update the status of a project (with access check)
 def update_project_status(data, user_id, role):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # Extract data from the input
         project_name = data.get('project_name')
         new_status = data.get('new_status')
 
-        # Validate required fields
         if not project_name or not new_status:
-            return {"error": "Both 'project_name' and 'new_status' must be provided"}, 400
+            return jsonify({"error": "Both 'project_name' and 'new_status' must be provided"}), 400
 
-        # Get project_id from project_name
+        # Get project_id
         cursor.execute("SELECT project_id FROM Projects WHERE project_name = %s", (project_name,))
-        project_result = cursor.fetchone()
+        result = cursor.fetchone()
 
-        if not project_result:
-            return {"error": "Project not found"}, 404
+        if not result:
+            return jsonify({"error": "Project not found"}), 404
 
-        project_id = project_result[0]
+        project_id = result[0]
 
-        # Check if user has access to this project
+        # Check access
         if not user_has_access_to_project(user_id, role, project_id, conn):
-            return {"error": "You do not have access to this project"}, 403
+            return jsonify({"error": "You do not have access to this project"}), 403
 
-        # Update the project status
-        cursor.execute("""
-    UPDATE Projects SET status = %s WHERE project_id = %s
-""", (new_status, project_id))
-
+        # Update status
+        cursor.execute("UPDATE Projects SET status = %s WHERE project_id = %s", (new_status, project_id))
         conn.commit()
 
-        # Log the activity
-        log_activity(user_id, "Project_Status_Update", f"Updated project '{project_name}' status to {new_status}")
+        log_activity(user_id, "Project_Status_Update", f"Updated project '{project_name}' status to '{new_status}'")
 
-        # Return success response with updated data
         return {
             "project_name": project_name,
             "new_status": new_status,
@@ -1561,25 +1568,28 @@ def update_project_status(data, user_id, role):
 
     except Exception as e:
         print(f"Database Error: {e}")
-        return {"error": f"Database error: {str(e)}"}, 500
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
 
     finally:
         conn.close()
 
-# Function to log activities
+
+# Function to log user activity
 def log_activity(user_id, activity_type, description):
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
         cursor.execute("""
-    INSERT INTO Activity_Log (user_id, activity_type, description)
-    VALUES (%s, %s, %s)
-""", (user_id, activity_type, description))
+            INSERT INTO Activity_Log (user_id, activity_type, description)
+            VALUES (%s, %s, %s)
+        """, (user_id, activity_type, description))
         conn.commit()
     except Exception as e:
         print(f"Error logging activity: {e}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()
+
 
 # New API to get projects for the current user
 @app.route('/api/my-projects', methods=['GET'])
