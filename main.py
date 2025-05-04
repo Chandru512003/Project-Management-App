@@ -13,6 +13,7 @@ app.secret_key = secrets.token_hex(16)
 
 # Configure Gemini API using environment variable
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+DB_Password = os.environ.get("DB_Password")
 if not GEMINI_API_KEY:
     raise ValueError("Missing GEMINI_API_KEY environment variable")
 
