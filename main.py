@@ -21,21 +21,16 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 # Update the database connection function to use mysql.connector
 def get_db_connection():
-    """
-    Creates a connection to the MySQL database using mysql.connector
-    Returns the connection object
-    """
     try:
-        conn = mysql.connector.connect(
-            host=os.environ.get('DB_HOST', 'ql12.freesqldatabase.com'),
-            user=os.environ.get('DB_USER', 'sql12776862'),
-            password=os.environ.get('DB_PASSWORD', ' M42wj1fStc'),  # Replace with actual password or env variable
-            database=os.environ.get('DB_NAME', 'sql12776862'),
-            port=int(os.environ.get('DB_PORT', '3306'))
+        return mysql.connector.connect(
+            host="sql12.freesqldatabase.com",        # Replace with your actual host
+            user="sql12776862",               # Your database username
+            password="M42wj1fStc",          # Your DB password
+            database="sql12776862",
+            port= 3306
         )
-        return conn
-    except mysql.connector.Error as e:
-        print(f"Error connecting to MySQL database: {e}")
+    except Error as e:
+        print(f"Database Connection Error: {e}")
         raise
 
 # Authentication middleware
