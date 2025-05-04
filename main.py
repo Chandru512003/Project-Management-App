@@ -694,34 +694,6 @@ def parse_query_with_gemini(query, user_projects=None, context=None):
         print(f"Error parsing query with Gemini API: {e}")
         return {"error": str(e)}
 
-def generate_response_with_gemini(username, raw_data):
-
-    try:
-        model = genai.GenerativeModel("models/gemini-1.5-flash")
-
-        # Construct the prompt
-        prompt = f"""
-You are an AI assistant helping users track their project progress.
-
-Here is the logged-in user's name: {username}
-Below is the list of completed projects returned from the database (may be empty):
-
-{raw_data}
-
-Please analyze and respond with:
-- A natural, human-like congratulatory message if there are completed projects.
-- A soft and informative message if the list is empty, telling the user they haven’t completed any projects yet.
-Avoid listing raw fields. Write a friendly message in professional tone.
-Do not summarize generically. Reflect data content and username personally.
-"""
-
-        response = model.generate_content(prompt)
-        return response.text
-
-    except Exception as e:
-        print(f"Gemini API Error: {e}")
-        return f"Sorry {username}, we couldn't generate your project summary at this moment due to a system error."
-
 # Serve the login page as default route
 @app.route('/')
 def login():
@@ -946,59 +918,38 @@ def handle_query():
     else:
         return jsonify({"error": "Invalid query"}), 400
 
-# Updated Function to handle the "Add a new project" session using Gemini
-def handle_add_project_session(user_id, query, username):
+# Function to handle the "Add a new project" session
+def handle_add_project_session(user_id, query):
     project_details = session.get("project_details", {})
-    
     if "project_name" not in project_details:
         project_details["project_name"] = query.strip()
         session["project_details"] = project_details
-        raw_data = {"next_step": "description"}
-        return generate_response_with_gemini(raw_data, username)
-
+        return jsonify({"message": "Got it! Now please provide the description of the project."}), 200
     elif "description" not in project_details:
         project_details["description"] = query.strip()
         session["project_details"] = project_details
-        raw_data = {"next_step": "start_date"}
-        return generate_response_with_gemini(raw_data, username)
-
+        return jsonify({"message": "Great! Now please provide the start date of the project (format: YYYY-MM-DD)."}), 200
     elif "start_date" not in project_details:
         project_details["start_date"] = query.strip()
         session["project_details"] = project_details
-        raw_data = {"next_step": "end_date"}
-        return generate_response_with_gemini(raw_data, username)
-
+        return jsonify({"message": "Great! Now please provide the end date of the project (format: YYYY-MM-DD)."}), 200
     elif "end_date" not in project_details:
         project_details["end_date"] = query.strip()
         session.pop("in_session")
         session.pop("project_details")
-        return insert_project(user_id, project_details, username)
+        return insert_project(user_id, project_details)
 
-# Updated function to insert a new project and respond with Gemini
-def insert_project(user_id, data, username):
+# Function to insert a new project
+def insert_project(user_id, data):
     conn = get_db_connection()
     cursor = conn.cursor()
-    
     try:
         cursor.execute("""
-            INSERT INTO Projects (project_name, description, start_date, end_date, status, created_by)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (data['project_name'], data['description'], data['start_date'], data['end_date'], 'Pending', user_id))
+    INSERT INTO Projects (project_name, description, start_date, end_date, status, created_by)
+    VALUES (%s, %s, %s, %s, %s, %s)""", (data['project_name'], data['description'], data['start_date'], data['end_date'], 'Pending', user_id))
         conn.commit()
-        
         log_activity(user_id, "Project_Creation", f"Created project: {data['project_name']}")
-        
-        # Prepare raw data to send to Gemini for natural response
-        raw_data = {
-            "action": "project_created",
-            "project_name": data['project_name'],
-            "description": data['description'],
-            "start_date": data['start_date'],
-            "end_date": data['end_date'],
-            "status": "Pending"
-        }
-        return generate_response_with_gemini(raw_data, username)
-    
+        return jsonify({"message": "Project added successfully!"}), 200
     except Exception as e:
         print(f"Database Error: {e}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
