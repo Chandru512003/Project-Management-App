@@ -337,7 +337,11 @@ def api_verify_identity():
             return jsonify({"error": "Incorrect security answer."}), 400
         
         # Return success with user_id for the next step
-        return jsonify({"message": "Identity verified successfully.", "user_id": user_id}), 200
+        return jsonify({
+            "message": "Identity verified successfully.",
+            "user_id": user_id,
+            "username": username
+        }), 200
     except Exception as e:
         print(f"Identity Verification Error: {e}")
         return jsonify({"error": f"Failed to verify identity: {str(e)}"}), 500
