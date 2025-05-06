@@ -571,6 +571,14 @@
                 padding: 10px;
             }
         }
+/* Highlight Styles */
+.highlight-project { color: #36a2eb; font-weight: bold; } /* Blue */
+.highlight-task { color: #ff6384; font-weight: bold; }     /* Red */
+.highlight-status { color: #4bc0c0; font-weight: bold; }   /* Teal */
+.highlight-priority { color: #ffa726; font-weight: bold; }  /* Amber */
+.highlight-confirm { color: #66bb6a; font-weight: bold; }  /* Green */
+.highlight-error { color: #ef5350; font-weight: bold; }    /* Red */
+.highlight-generic { color: #ce93d8; font-weight: bold; }  /* Purple */
     </style>
 </head>
 <body>
@@ -635,533 +643,376 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         let taskChart;
-        let currentUser = {
-            id: null,
-            username: "",
-            role: "",
-            email: ""
-        };
+let currentUser = {
+    id: null,
+    username: "",
+    role: "",
+    email: ""
+};
 
-        // Function to fetch project status data and render the pie chart
-        async function fetchAndRenderChart() {
-            try {
-                const response = await fetch('/get_project_status');
-                const data = await response.json();
-                if (!data.labels || !data.data) {
-                    console.error("Invalid data format:", data);
-                    return;
-                }
-                const ctx = document.getElementById('taskChart').getContext('2d');
-                if (taskChart) {
-                    taskChart.destroy();
-                }
-                taskChart = new Chart(ctx, {
-                    type: 'pie',
-                    data: {
-                        labels: data.labels,
-                        datasets: [{
-                            label: 'Project Status',
-                            data: data.data,
-                            backgroundColor: ['#ff6384', '#36a2eb', '#4bc0c0'],
-                            hoverOffset: 4
-                        }]
+// Function to fetch project status data and render the pie chart
+async function fetchAndRenderChart() {
+    try {
+        const response = await fetch('/get_project_status');
+        const data = await response.json();
+        if (!data.labels || !data.data) {
+            console.error("Invalid data format:", data);
+            return;
+        }
+        const ctx = document.getElementById('taskChart').getContext('2d');
+        if (taskChart) {
+            taskChart.destroy();
+        }
+        taskChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Project Status',
+                    data: data.data,
+                    backgroundColor: ['#ff6384', '#36a2eb', '#4bc0c0'],
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            font: { size: 14 },
+                            color: '#e0e0e0'
+                        }
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'top',
-                                labels: {
-                                    font: { size: 14 },
-                                    color: '#e0e0e0'
-                                }
-                            },
-                            title: {
-                                display: true,
-                                text: 'Project Distribution',
-                                font: { size: 16 },
-                                color: '#bb86fc'
-                            }
-                        }
+                    title: {
+                        display: true,
+                        text: 'Project Distribution',
+                        font: { size: 16 },
+                        color: '#bb86fc'
                     }
-                });
-            } catch (error) {
-                console.error("Error fetching project status data:", error);
-                // Display fallback chart with demo data
-                displayDemoChart();
+                }
             }
-        }
+        });
+    } catch (error) {
+        console.error("Error fetching project status data:", error);
+        displayDemoChart();
+    }
+}
 
-        // Function to display a demo chart when API fails
-        function displayDemoChart() {
-            const ctx = document.getElementById('taskChart').getContext('2d');
-            if (taskChart) {
-                taskChart.destroy();
-            }
-            taskChart = new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: ['Pending', 'In Progress', 'Completed'],
-                    datasets: [{
-                        label: 'Project Status',
-                        data: [4, 7, 3],
-                        backgroundColor: ['#ff6384', '#36a2eb', '#4bc0c0'],
-                        hoverOffset: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            labels: {
-                                font: { size: 14 },
-                                color: '#e0e0e0'
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: 'Project Distribution (Demo)',
-                            font: { size: 16 },
-                            color: '#bb86fc'
-                        }
-                    }
-                }
-            });
-        }
+// Function to show typing indicator
+function showTypingIndicator() {
+    const chatBox = document.getElementById('chatBox');
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'typing-indicator';
+    typingDiv.id = 'typingIndicator';
+    typingDiv.innerHTML = '<span></span><span></span><span></span>';
+    chatBox.appendChild(typingDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    return typingDiv;
+}
 
-        // Function to show typing indicator
-        function showTypingIndicator() {
-            const chatBox = document.getElementById('chatBox');
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'typing-indicator';
-            typingDiv.id = 'typingIndicator';
-            typingDiv.innerHTML = '<span></span><span></span><span></span>';
-            chatBox.appendChild(typingDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-            return typingDiv;
-        }
+// Function to remove typing indicator
+function removeTypingIndicator() {
+    const typingIndicator = document.getElementById('typingIndicator');
+    if (typingIndicator) {
+        typingIndicator.remove();
+    }
+}
 
-        // Function to remove typing indicator
-        function removeTypingIndicator() {
-            const typingIndicator = document.getElementById('typingIndicator');
-            if (typingIndicator) {
-                typingIndicator.remove();
-            }
-        }
-        
-        // Function to animate text appearing letter by letter
-        function animateText(element, text, speed = 20) {
-            let index = 0;
-            element.textContent = '';
-            
-            return new Promise((resolve) => {
-                function addLetter() {
-                    if (index < text.length) {
-                        element.textContent += text.charAt(index);
-                        index++;
-                        setTimeout(addLetter, speed);
-                    } else {
-                        resolve();
-                    }
-                }
-                addLetter();
-            });
-        }
-        
-        // Function to handle Enter key press
-        function handleEnter(event) {
-            if (event.key === 'Enter') {
-                sendQuery();
-            }
-        }
-        
-        // Function to send the query to the backend
-        async function sendQuery() {
-            const queryInput = document.getElementById('query');
-            const chatBox = document.getElementById('chatBox');
-            const userMessage = queryInput.value.trim();
-            if (!userMessage) return;
-        
-            // Add user message to chat
-            const userMessageDiv = document.createElement('div');
-            userMessageDiv.className = 'message user-message';
-            userMessageDiv.textContent = userMessage;
-            chatBox.appendChild(userMessageDiv);
-        
-            // Clear input field
-            queryInput.value = '';
-            
-            // Show typing indicator
-            const typingIndicator = showTypingIndicator();
-            
-            // Focus back on input field
-            queryInput.focus();
-        
-            try {
-                const userId = currentUser.id || 1;
-                const response = await fetch('/query', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: userMessage, user_id: userId })
-                });
-                const result = await response.json();
-        
-                // Remove typing indicator after a small delay for natural effect
-                setTimeout(() => {
-                    removeTypingIndicator();
-                    
-                    // Create bot response div
-                    const botResponseDiv = document.createElement('div');
-                    botResponseDiv.className = 'message bot-message';
-                    chatBox.appendChild(botResponseDiv);
-        
-                    // Format response based on action type
-                    let responseText = formatBotResponse(result);
-                    
-                    // Animate the text
-                    animateText(botResponseDiv, responseText, 10).then(() => {
-                        // If HTML content is needed, replace with formatted HTML after animation
-                        if (responseText !== responseText.replace(/<[^>]*>/g, '')) {
-                            botResponseDiv.innerHTML = responseText;
-                        }
-                    });
-                    
-                    // If the response modified data, refresh the chart
-                    if (['update_project_status', 'update_task_status', 'start_add_project', 'start_add_task'].includes(result.action)) {
-                        fetchAndRenderChart();
-                    }
-                }, 800); // Delay before showing response
-            } catch (error) {
-                console.error("Error sending query:", error);
-                
-                // Remove typing indicator after small delay
-                setTimeout(() => {
-                    removeTypingIndicator();
-                    
-                    // Show error message
-                    const botResponseDiv = document.createElement('div');
-                    botResponseDiv.className = 'message bot-message';
-                    animateText(botResponseDiv, 'Sorry, I encountered an error while processing your request. Please try again.', 10);
-                    chatBox.appendChild(botResponseDiv);
-                }, 800);
-            }
-        
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-        
-        // Improved formatBotResponse function
-        function formatBotResponse(result) {
-            if (result.action) {
-                switch (result.action) {
-                    case 'get_project_status':
-                        return `Project Status: ${result.project_name || 'Unknown project'}`;
-                        
-                    case 'get_task_status':
-                        return `Task Status: ${result.task_name || 'Unknown task'}`;
-                        
-                    case 'update_project_status':
-                        return `• Updated Project: ${result.project_name || 'Unknown project'}\n• New Status: ${result.new_status || 'Unknown status'}`;
-                        
-                    case 'update_task_status':
-                        return `• Updated Task: ${result.task_name || 'Unknown task'}\n• Task Name: ${result.task_name || 'Unknown task'}\n• New Status: ${result.new_status || 'Unknown status'}`;
-                        
-                    case 'start_add_project':
-                        return `Starting Project Creation\nPlease provide the project details.`;
-                        
-                    case 'start_add_task':
-                        return `Starting Task Creation\nPlease provide the task details.`;
-                        
-                    case 'list_pending_projects':
-                    case 'list_completed_projects':
-                    case 'list_all_projects_status':
-                        if (Array.isArray(result.projects)) {
-                            let response = `${formatActionTitle(result.action)}:\n`;
-                            result.projects.forEach(proj => {
-                                response += `• ${proj.project_name || 'Unnamed'}: ${proj.status || 'Unknown status'}\n`;
-                            });
-                            return response;
-                        } else {
-                            return `No projects found for this query.`;
-                        }
-                        
-                    case 'list_pending_tasks':
-                    case 'list_completed_tasks':
-                    case 'list_all_tasks_status':
-                    case 'list_low_priority_tasks':
-                    case 'list_medium_priority_tasks':
-                    case 'list_high_priority_tasks':
-                        if (Array.isArray(result.tasks)) {
-                            let response = `${formatActionTitle(result.action)}:\n`;
-                            result.tasks.forEach(task => {
-                                response += `• ${task.task_name || 'Unnamed'}: ${task.status || 'Unknown'} (Priority: ${task.priority || 'Unspecified'})\n`;
-                            });
-                            return response;
-                        } else {
-                            return `No tasks found for this query.`;
-                        }
-                        
-                    case 'confirmation':
-                        return `Confirmation response: ${result.intent || 'Unknown intent'}`;
-                        
-                    case 'terminate_session':
-                        return `Session terminated. You can start a new conversation.`;
-                        
-                    case 'priority':
-                        return `Priority set to: ${result.priority || 'Unknown priority'}`;
-                        
-                    default:
-                        if (result.message) {
-                            // Convert paragraphs to bullet points if they contain multiple sentences
-                            if (result.message.includes('.') && result.message.split('.').length > 2) {
-                                const sentences = result.message.split('.').filter(s => s.trim().length > 0);
-                                if (sentences.length > 1) {
-                                    return sentences.map(s => `• ${s.trim()}`).join('\n');
-                                }
-                            }
-                            return result.message;
-                        } else if (result.error) {
-                            return `Error: ${result.error}`;
-                        } else {
-                            return 'Response received but unable to process.';
-                        }
-                }
-            } else if (result.project_name && result.status) {
-                return `• Project Name: ${result.project_name}\n• Status: ${result.status}`;
-            }
-            else if (result.task_name && result.status) {
-                    return `• Task Name: ${result.task_name}\n• Status: ${result.status}`;
-            } else if (result.message) {
-                // Convert paragraphs to bullet points if they contain multiple sentences
-                if (result.message.includes('.') && result.message.split('.').length > 2) {
-                    const sentences = result.message.split('.').filter(s => s.trim().length > 0);
-                    if (sentences.length > 1) {
-                        return sentences.map(s => `• ${s.trim()}`).join('\n');
-                    }
-                }
-                return result.message;
-            } else if (result.error) {
-                return `Error: ${result.error}`;
-            } else if (Array.isArray(result)) {
-                let response = `Results:\n`;
-                result.forEach(item => {
-                    response += `• ${formatResultItem(item)}\n`;
-                });
-                return response;
+// Function to animate text appearing letter by letter
+function animateText(element, text, speed = 10) {
+    const plainText = text.replace(/<[^>]*>/g, '');
+    let index = 0;
+    element.textContent = '';
+    return new Promise((resolve) => {
+        function addLetter() {
+            if (index < plainText.length) {
+                element.textContent += plainText.charAt(index);
+                index++;
+                setTimeout(addLetter, speed);
             } else {
-                return 'No response from server.';
+                element.innerHTML = text; // Render full HTML at end
+                resolve();
             }
         }
-        
-        // Enhanced animateText function to handle bullet points properly
-        function animateText(element, text, speed = 20) {
-            let index = 0;
-            element.textContent = '';
-            
-            // Check if text has bullet points
-            if (text.includes('•')) {
-                // Create a temporary div to handle HTML formatting
-                const tempDiv = document.createElement('div');
-                const paragraphs = text.split('\n');
-                
-                return new Promise((resolve) => {
-                    let paragraphIndex = 0;
-                    
-                    function addParagraph() {
-                        if (paragraphIndex < paragraphs.length) {
-                            const para = paragraphs[paragraphIndex];
-                            const paraElement = document.createElement('div');
-                            
-                            if (para.trim().startsWith('•')) {
-                                // This is a bullet point
-                                paraElement.style.display = 'flex';
-                                paraElement.style.marginBottom = '5px';
-                                paraElement.innerHTML = para;
-                            } else {
-                                paraElement.textContent = para;
-                            }
-                            
-                            element.appendChild(paraElement);
-                            paragraphIndex++;
-                            
-                            // Small delay between paragraphs
-                            setTimeout(addParagraph, speed * 10);
-                        } else {
-                            resolve();
-                        }
-                    }
-                    
-                    addParagraph();
-                });
-            } else {
-                // Original behavior for regular text
-                return new Promise((resolve) => {
-                    function addLetter() {
-                        if (index < text.length) {
-                            element.textContent += text.charAt(index);
-                            index++;
-                            setTimeout(addLetter, speed);
-                        } else {
-                            resolve();
-                        }
-                    }
-                    addLetter();
-                });
-            }
-        }
-        
-        // Helper function to format action titles
-        function formatActionTitle(action) {
-            if (!action) return 'Results';
-            
-            return action
-                .replace('list_', '')
-                .replace(/_/g, ' ')
-                .split(' ')
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                .join(' ');
-        }
-        
-        // Helper function to format result items
-        function formatResultItem(item) {
-            if (typeof item === 'string') return item;
-            
-            let formattedText = '';
-            for (const [key, value] of Object.entries(item)) {
-                const formattedKey = key.replace(/_/g, ' ').charAt(0).toUpperCase() + key.replace(/_/g, ' ').slice(1);
-                formattedText += `${formattedKey}: ${value}, `;
-            }
-            
-            return formattedText.slice(0, -2); // Remove trailing comma and space
-        }
-        
-        // Toggle profile dropdown visibility
-        function toggleProfileDropdown() {
-            const dropdown = document.getElementById('profileDropdown');
-            dropdown.classList.toggle('show');
-            
-            // If opening the dropdown, fetch user data
-            if (dropdown.classList.contains('show')) {
-                fetchUserProfile();
-            }
-        }
-        
-        // Close dropdown when clicking outside
-        window.onclick = function(event) {
-            if (!event.target.matches('.profile-icon') && !event.target.closest('.profile-dropdown')) {
-                const dropdown = document.getElementById('profileDropdown');
-                if (dropdown.classList.contains('show')) {
-                    dropdown.classList.remove('show');
-                }
-            }
-        }
-        
-        // Fetch user profile data from backend
-        async function fetchUserProfile() {
-            try {
-                const response = await fetch('/api/user-profile');
-                const userData = await response.json();
-        
-                if (userData && userData.success) {
-                    updateProfileUI(userData.user);
-                    currentUser = userData.user;
-                } else {
-                    console.error("Failed to fetch user profile data");
-                    // Use demo data as fallback
-                    updateProfileUI({
-                        username: "Demo User",
-                        id: "USR123456",
-                        role: "Project Manager",
-                        email: "demo@example.com"
-                    });
-                }
-            } catch (error) {
-                console.error("Error fetching user profile:", error);
-                // Use demo data as fallback
-                updateProfileUI({
-                    username: "Demo User",
-                    id: "USR123456",
-                    role: "Project Manager",
-                    email: "demo@example.com"
-                });
-            }
-        }
-        
-        // Update profile UI with user data
-        function updateProfileUI(user) {
-            document.getElementById('profileName').textContent = user.username || "Unknown User";
-            document.getElementById('profileUserId').textContent = user.id || "N/A";
-            document.getElementById('profileUsername').textContent = user.username || "N/A";
-            document.getElementById('profileRole').textContent = user.role || "N/A";
-            document.getElementById('profileEmail').textContent = user.email || "N/A";
-        
-            // Update avatar with first letter of username
-            const avatarElement = document.getElementById('profileAvatar');
-            const iconElement = document.getElementById('profileIcon');
-        
-            const firstLetter = (user.username || "U").charAt(0).toUpperCase();
-            avatarElement.textContent = firstLetter;
-            iconElement.textContent = firstLetter;
-        }
-        
-        // Logout functions
-        function showLogoutConfirmation() {
-            document.getElementById('logoutModal').style.display = 'block';
-        }
-        
-        function hideLogoutConfirmation() {
-            document.getElementById('logoutModal').style.display = 'none';
-        }
-        
-        async function performLogout() {
-            try {
-                const response = await fetch('/api/logout', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-        
-                if (response.ok) {
-                    localStorage.removeItem('isAuthenticated');
-                    window.location.href = 'login.html';
-                } else {
-                    alert('Failed to log out. Please try again.');
-                    hideLogoutConfirmation();
-                }
-            } catch (error) {
-                console.error("Logout error:", error);
-                alert('An error occurred while logging out.');
-                hideLogoutConfirmation();
-            }
-        }
-        
-        // Check authentication status on page load
-        window.onload = async function () {
-            try {
-                const response = await fetch('/api/check-auth');
-                const data = await response.json();
-        
-                if (!data.authenticated) {
-                    // For demo purposes, we'll still show the interface
-                    // Uncomment the following lines in production:
-                    // localStorage.removeItem('isAuthenticated');
-                    // window.location.href = 'login.html';
-                    console.log('Authentication check failed, but showing interface for demo');
-                }
-        
-                // Initialize chart with demo data if API is not available
+        addLetter();
+    });
+}
+
+// Function to handle Enter key press
+function handleEnter(event) {
+    if (event.key === 'Enter') {
+        sendQuery();
+    }
+}
+
+// Function to send the query to the backend
+async function sendQuery() {
+    const queryInput = document.getElementById('query');
+    const chatBox = document.getElementById('chatBox');
+    const userMessage = queryInput.value.trim();
+    if (!userMessage) return;
+
+    // Add user message to chat
+    const userMessageDiv = document.createElement('div');
+    userMessageDiv.className = 'message user-message';
+    userMessageDiv.textContent = userMessage;
+    chatBox.appendChild(userMessageDiv);
+
+    // Clear input field
+    queryInput.value = '';
+
+    // Show typing indicator
+    const typingIndicator = showTypingIndicator();
+
+    // Focus back on input field
+    queryInput.focus();
+
+    try {
+        const userId = currentUser.id || 1;
+        const response = await fetch('/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: userMessage, user_id: userId })
+        });
+        const result = await response.json();
+
+        setTimeout(() => {
+            removeTypingIndicator();
+
+            const botResponseDiv = document.createElement('div');
+            botResponseDiv.className = 'message bot-message';
+            chatBox.appendChild(botResponseDiv);
+
+            let responseText = formatBotResponse(result);
+
+            animateText(botResponseDiv, responseText, 10).then(() => {
+                botResponseDiv.innerHTML = responseText;
+            });
+
+            if (['update_project_status', 'update_task_status', 'start_add_project', 'start_add_task'].includes(result.action)) {
                 fetchAndRenderChart();
-        
-                // Fetch initial user data
-                fetchUserProfile();
-        
-            } catch (error) {
-                console.error("Auth check error:", error);
-                console.log('Continuing with demo mode due to auth check error');
-        
             }
-        };
+        }, 800);
+    } catch (error) {
+        console.error("Error sending query:", error);
+        setTimeout(() => {
+            removeTypingIndicator();
+            const botResponseDiv = document.createElement('div');
+            botResponseDiv.className = 'message bot-message';
+            animateText(botResponseDiv, 'Sorry, I encountered an error while processing your request. Please try again.', 10);
+            chatBox.appendChild(botResponseDiv);
+        }, 800);
+    }
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function formatBotResponse(result) {
+    if (result.action) {
+        switch (result.action) {
+            case 'list_pending_projects':
+            case 'list_completed_projects':
+            case 'list_all_projects_status':
+                if (Array.isArray(result.projects)) {
+                    let response = `<strong>${formatActionTitle(result.action)}:</strong><br>`;
+                    result.projects.forEach(proj => {
+                        response += `• <span class="highlight-project">${proj.project_name || 'Unnamed'}</span>: <span class="highlight-status">${proj.status || 'Unknown status'}</span><br>`;
+                    });
+                    return response;
+                } else {
+                    return `<span class="highlight-error">No projects found.</span>`;
+                }
+
+            case 'list_pending_tasks':
+            case 'list_completed_tasks':
+            case 'list_all_tasks_status':
+            case 'list_low_priority_tasks':
+            case 'list_medium_priority_tasks':
+            case 'list_high_priority_tasks':
+                if (Array.isArray(result.tasks)) {
+                    let response = `<strong>${formatActionTitle(result.action)}:</strong><br>`;
+                    result.tasks.forEach(task => {
+                        response += `• <span class="highlight-task">${task.task_name || 'Unnamed'}</span>: <span class="highlight-status">${task.status || 'Unknown'}</span> (Priority: <span class="highlight-priority">${task.priority || 'Unspecified'}</span>)<br>`;
+                    });
+                    return response;
+                } else {
+                    return `<span class="highlight-error">No tasks found.</span>`;
+                }
+
+            case 'get_project_status':
+                return `Project Status: <span class="highlight-project">${result.project_name || 'Unknown project'}</span>`;
+
+            case 'get_task_status':
+                return `Task Status: <span class="highlight-task">${result.task_name || 'Unknown task'}</span>`;
+
+            case 'update_project_status':
+                return `✅ <strong>Updated Project:</strong> <span class="highlight-project">${result.project_name || 'Unknown project'}</span><br>➡️ <strong>New Status:</strong> <span class="highlight-status">${result.new_status || 'Unknown status'}</span>`;
+
+            case 'update_task_status':
+                return `✅ <strong>Updated Task:</strong> <span class="highlight-task">${result.task_name || 'Unknown task'}</span><br>➡️ <strong>New Status:</strong> <span class="highlight-status">${result.new_status || 'Unknown status'}</span>`;
+
+            case 'confirmation':
+                return `✔️ Confirmation response: <span class="highlight-confirm">${result.intent || 'Unknown intent'}</span>`;
+
+            case 'priority':
+                return `📌 Priority set to: <span class="highlight-priority">${result.priority || 'Unknown priority'}</span>`;
+
+            default:
+                if (result.message) {
+                    return result.message
+                        .replace(/<strong>(.*?)<\/strong>/g, '<span class="highlight-generic">$1</span>')
+                        .replace(/\n/g, '<br>');
+                } else if (result.error) {
+                    return `❌ Error: <span class="highlight-error">${result.error}</span>`;
+                } else {
+                    return 'Response received but unable to process.';
+                }
+        }
+    } else if (result.project_name && result.status) {
+        return `• <strong>Project Name:</strong> <span class="highlight-project">${result.project_name}</span><br>• <strong>Status:</strong> <span class="highlight-status">${result.status}</span>`;
+    } else if (result.task_name && result.status) {
+        return `• <strong>Task Name:</strong> <span class="highlight-task">${result.task_name}</span><br>• <strong>Status:</strong> <span class="highlight-status">${result.status}</span>`;
+    } else if (result.message) {
+        return result.message
+            .replace(/<strong>(.*?)<\/strong>/g, '<span class="highlight-generic">$1</span>')
+            .replace(/\n/g, '<br>');
+    } else if (result.error) {
+        return `Error: <span class="highlight-error">${result.error}</span>`;
+    } else if (Array.isArray(result)) {
+        let response = `<strong>Results:</strong><br>`;
+        result.forEach(item => {
+            response += `• ${formatResultItem(item)}<br>`;
+        });
+        return response;
+    } else {
+        return 'No response from server.';
+    }
+}
+
+function formatActionTitle(action) {
+    if (!action) return 'Results';
+    return action
+        .replace('list_', '')
+        .replace(/_/g, ' ')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
+
+function formatResultItem(item) {
+    if (typeof item === 'string') return item;
+    let formattedText = '';
+    for (const [key, value] of Object.entries(item)) {
+        const formattedKey = key.replace(/_/g, ' ').charAt(0).toUpperCase() + key.slice(1);
+        formattedText += `${formattedKey}: <span class="highlight-generic">${value}</span>, `;
+    }
+    return formattedText.slice(0, -2); // Remove trailing comma and space
+}
+
+
+
+// Toggle profile dropdown visibility
+function toggleProfileDropdown() {
+    const dropdown = document.getElementById('profileDropdown');
+    dropdown.classList.toggle('show');
+    if (dropdown.classList.contains('show')) {
+        fetchUserProfile();
+    }
+}
+
+// Close dropdown when clicking outside
+window.onclick = function(event) {
+    if (!event.target.matches('.profile-icon') && !event.target.closest('.profile-dropdown')) {
+        const dropdown = document.getElementById('profileDropdown');
+        if (dropdown.classList.contains('show')) {
+            dropdown.classList.remove('show');
+        }
+    }
+}
+
+// Fetch user profile data from backend
+async function fetchUserProfile() {
+    try {
+        const response = await fetch('/api/user-profile');
+        const userData = await response.json();
+        if (userData && userData.success) {
+            updateProfileUI(userData.user);
+            currentUser = userData.user;
+        } else {
+            updateProfileUI({
+                username: "Demo User",
+                id: "USR123456",
+                role: "Unverified",
+                email: "demo@example.com"
+            });
+        }
+    } catch (error) {
+        updateProfileUI({
+            username: "Demo User",
+            id: "USR123456",
+            role: "Unverified",
+            email: "demo@example.com"
+        });
+    }
+}
+
+// Update profile UI with user data
+function updateProfileUI(user) {
+    document.getElementById('profileName').textContent = user.username || "Unknown User";
+    document.getElementById('profileUserId').textContent = user.id || "N/A";
+    document.getElementById('profileUsername').textContent = user.username || "N/A";
+    document.getElementById('profileRole').textContent = user.role || "N/A";
+    document.getElementById('profileEmail').textContent = user.email || "N/A";
+
+    const avatarElement = document.getElementById('profileAvatar');
+    const iconElement = document.getElementById('profileIcon');
+    const firstLetter = (user.username || "U").charAt(0).toUpperCase();
+    avatarElement.textContent = firstLetter;
+    iconElement.textContent = firstLetter;
+}
+
+// Logout functions
+function showLogoutConfirmation() {
+    document.getElementById('logoutModal').style.display = 'block';
+}
+function hideLogoutConfirmation() {
+    document.getElementById('logoutModal').style.display = 'none';
+}
+window.onload = async function () {
+    try {
+        const response = await fetch('/api/check-auth');
+        const data = await response.json();
+        if (!data.authenticated) {
+            localStorage.removeItem('isAuthenticated');
+            window.location.href = 'login.html';
+            return;
+        }
+        fetchAndRenderChart();
+        fetchUserProfile();
+    } catch (error) {
+        localStorage.removeItem('isAuthenticated');
+        window.location.href = 'login.html';
+    }
+};
+async function performLogout() {
+    try {
+        const response = await fetch('/api/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (response.ok) {
+            localStorage.removeItem('isAuthenticated');
+            window.location.href = 'login.html';
+        } else {
+            alert('Failed to log out. Please try again.');
+            hideLogoutConfirmation();
+        }
+    } catch (error) {
+        alert('An error occurred while logging out.');
+        hideLogoutConfirmation();
+    }
+}
 </script>
 </body>
 </html>

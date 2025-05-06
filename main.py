@@ -396,6 +396,23 @@ def api_forgot_password():
         if 'conn' in locals() and conn:
             conn.close()
 
+# CORS handlers for preflight requests
+@app.route('/api/verify-identity', methods=['OPTIONS'])
+def handle_options_verify_identity():
+    response = make_response()
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+    response.headers.add('Access-Control-Allow-Methods', 'POST')
+    return response
+
+@app.route('/api/forgot-password', methods=['OPTIONS'])
+def handle_options_forgot_password():
+    response = make_response()
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+    response.headers.add('Access-Control-Allow-Methods', 'POST')
+    return response
+
 # User profile endpoint
 @app.route('/api/user-profile', methods=['GET'])
 def get_user_profile():
@@ -478,13 +495,13 @@ def register_page():
 def parse_query_with_gemini(query, user_projects=None, context=None):
     try:
         model = genai.GenerativeModel("models/gemini-1.5-flash")
-
+        # Bot name
+        bot_name = "Gemmo"
         # If we have user-specific projects, include them in the context
         project_context = ""
         if user_projects:
             project_names = [p['project_name'] for p in user_projects]
             project_context = f"Consider only these projects: {', '.join(project_names)}. "
-
         # Add context-specific instructions to the prompt
         additional_instructions = ""
         if context == "termination":
@@ -492,7 +509,6 @@ def parse_query_with_gemini(query, user_projects=None, context=None):
             If the query indicates termination of the session (e.g., 'terminate', 'cancel', 'exit'), respond with:
             ACTION: terminate_session
             """
-
         elif context == "confirmation":
             additional_instructions = """
             If the query confirms an action (e.g., 'yes', 'ok'), respond with:
@@ -505,194 +521,350 @@ def parse_query_with_gemini(query, user_projects=None, context=None):
             ACTION: confirmation
             INTENT: UNKNOWN
             """
-
         elif context == "priority":
             additional_instructions = """
             If the query specifies a priority (e.g., 'low', 'medium', 'high'), respond with:
             ACTION: priority
             PRIORITY: [extracted priority]
             """
-
+        # New context for general user interaction
+        additional_instructions += f"""
+        If the query is a greeting, respond with:
+        ACTION: greeting
+        RESPONSE: [greeting response from {bot_name} mentioning the bot's name]
+        If the query expresses gratitude, respond with:
+        ACTION: gratitude
+        RESPONSE: [gratitude acknowledgment from {bot_name} with the {bot_name} mentioning the bot's name]
+        If the query is about your capabilities or features, respond with:
+        ACTION: show_features
+        RESPONSE: [short summary of what {bot_name} can do]
+        If the query is asking for your name, respond with:
+        ACTION: bot_identity
+        RESPONSE: [response mentioning the bot's name and purpose]
+        """
         # Construct the full prompt
         prompt = f"""{project_context}
         Interpret this project management query: "{query}"
-
         {additional_instructions}
-
         If the query is about checking a project's status, respond with:
         ACTION: get_project_status
         PROJECT_NAME: [extracted project name]
-
         If the query is about checking a task's status, respond with:
         ACTION: get_task_status
         TASK_NAME: [extracted task name]
-
         If the query is about updating a task status, respond with:
         ACTION: update_task_status
         TASK_NAME: [extracted task name]
-        NEW_STATUS: [extracted new task status]
-
+        NEW_STATUS: [extracted new status]
         If the query is about updating a project status, respond with:
         ACTION: update_project_status
-        NEW_STATUS: [extracted new project status]
+        NEW_STATUS: [extracted new status]
         PROJECT_NAME: [extracted project name]
-
         If the query is about adding a new project, respond with:
         ACTION: start_add_project
-
         If the query is about adding a new task, respond with:
         ACTION: start_add_task
-
         If the query is about listing pending projects, respond with:
         ACTION: list_pending_projects
-
         If the query is about listing completed projects, respond with:
         ACTION: list_completed_projects
-
         If the query is about listing all projects with their status, respond with:
         ACTION: list_all_projects_status
-
         If the query is about listing pending tasks, respond with:
         ACTION: list_pending_tasks
-
         If the query is about listing completed tasks, respond with:
         ACTION: list_completed_tasks
-
         If the query is about listing all tasks with their status, respond with:
         ACTION: list_all_tasks_status
-
         If the query is about listing low-priority tasks, respond with:
         ACTION: list_low_priority_tasks
-
         If the query is about listing medium-priority tasks, respond with:
         ACTION: list_medium_priority_tasks
-
         If the query is about listing high-priority tasks, respond with:
         ACTION: list_high_priority_tasks
-
         If the query is ambiguous, respond with:
         ACTION: ambiguous
         REASON: [reason for ambiguity]
-
         If the query doesn't match any known action, respond with:
         ACTION: invalid
         """
-
         interpreted_query = model.generate_content(prompt)
         interpreted_text = interpreted_query.text.strip()
         print(f"Interpreted Query: {interpreted_text}")
 
-        # Parse the structured response
+        # Fix line continuation issue in regex
+        lines = interpreted_text.splitlines()
+        interpreted_text = '\n'.join(lines)
+
+        # Extract action
         action_match = re.search(r"ACTION:\s*(\w+)", interpreted_text)
         if not action_match:
             return {"error": "Could not parse query"}
-
         action = action_match.group(1).lower()
 
         if action == "ambiguous":
             reason_match = re.search(r"REASON:\s*(.+)$", interpreted_text, re.MULTILINE | re.DOTALL)
             reason = reason_match.group(1).strip() if reason_match else "Query is ambiguous"
             return {"error": f"Ambiguous query. {reason}"}
-
         elif action == "invalid":
             return {"error": "Invalid query. Please try a different command."}
-
+        elif action in {"greeting", "gratitude", "show_features", "bot_identity"}:
+            response_match = re.search(r"RESPONSE:\s*(.+)$", interpreted_text, re.MULTILINE | re.DOTALL)
+            return {"action": action, "response": response_match.group(1).strip() if response_match else ""}
         elif action == "get_project_status":
             project_match = re.search(r"PROJECT_NAME:\s*(.+)$", interpreted_text, re.MULTILINE)
             if not project_match:
                 return {"error": "Could not identify project name"}
-            project_name = project_match.group(1).strip()
-            return {"action": "get_project_status", "project_name": project_name}
-
+            return {"action": "get_project_status", "project_name": project_match.group(1).strip()}
         elif action == "get_task_status":
             task_match = re.search(r"TASK_NAME:\s*(.+)$", interpreted_text, re.MULTILINE)
             if not task_match:
                 return {"error": "Could not identify task name"}
-            task_name = task_match.group(1).strip()
-            return {"action": "get_task_status", "task_name": task_name}
-
+            return {"action": "get_task_status", "task_name": task_match.group(1).strip()}
         elif action == "update_project_status":
             status_match = re.search(r"NEW_STATUS:\s*(.+)$", interpreted_text, re.MULTILINE)
             project_match = re.search(r"PROJECT_NAME:\s*(.+)$", interpreted_text, re.MULTILINE)
-
             if not (status_match and project_match):
                 return {"error": "Missing information for updating project status"}
-
             return {
                 "action": "update_project_status",
                 "new_status": status_match.group(1).strip(),
                 "project_name": project_match.group(1).strip()
             }
-
         elif action == "update_task_status":
             task_match = re.search(r"TASK_NAME:\s*(.+)$", interpreted_text, re.MULTILINE)
             status_match = re.search(r"NEW_STATUS:\s*(.+)$", interpreted_text, re.MULTILINE)
-
             if not (task_match and status_match):
                 return {"error": "Missing information for updating task status"}
-
             return {
                 "action": "update_task_status",
                 "task_name": task_match.group(1).strip(),
                 "new_status": status_match.group(1).strip()
             }
-
         elif action == "start_add_project":
             return {"action": "start_add_project"}
-
         elif action == "start_add_task":
             return {"action": "start_add_task"}
-
         elif action == "list_pending_projects":
             return {"action": "list_pending_projects"}
-
         elif action == "list_completed_projects":
             return {"action": "list_completed_projects"}
-
         elif action == "list_all_projects_status":
             return {"action": "list_all_projects_status"}
-
         elif action == "list_pending_tasks":
             return {"action": "list_pending_tasks"}
-
         elif action == "list_completed_tasks":
             return {"action": "list_completed_tasks"}
-
         elif action == "list_all_tasks_status":
             return {"action": "list_all_tasks_status"}
-
         elif action == "list_low_priority_tasks":
             return {"action": "list_low_priority_tasks"}
-
         elif action == "list_medium_priority_tasks":
             return {"action": "list_medium_priority_tasks"}
-
         elif action == "list_high_priority_tasks":
             return {"action": "list_high_priority_tasks"}
-
         elif action == "confirmation":
             intent_match = re.search(r"INTENT:\s*(\w+)", interpreted_text)
             if not intent_match:
                 return {"error": "Could not determine confirmation intent"}
-            intent = intent_match.group(1).upper()
-            return {"action": "confirmation", "intent": intent}
-
+            return {"action": "confirmation", "intent": intent_match.group(1).upper()}
         elif action == "terminate_session":
             return {"action": "terminate_session"}
-
         elif action == "priority":
             priority_match = re.search(r"PRIORITY:\s*(\w+)", interpreted_text)
             if not priority_match:
                 return {"error": "Could not determine priority"}
-            priority = priority_match.group(1).capitalize()
-            return {"action": "priority", "priority": priority}
-
+            return {"action": "priority", "priority": priority_match.group(1).capitalize()}
         else:
             return {"error": "Invalid action"}
-
     except Exception as e:
         print(f"Error parsing query with Gemini API: {e}")
         return {"error": str(e)}
+
+#function to format the response to the user
+def format_response_with_gemini(data, user_role, context_type, additional_context=None):
+    try:
+        model = genai.GenerativeModel("models/gemini-1.5-pro")  # Better handling of long prompts
+
+        # Helper to build formatted item lists
+        def format_item_list(items, type_name="item"):
+            return "<br>".join([
+                f"<strong>{item.get(f'{type_name}_name', 'Unnamed')}</strong> (<strong>{item.get('status', 'Unknown')}</strong>)"
+                for item in items
+            ])
+
+        # Helper to process Gemini response in batches
+        def generate_batched_response(item_list, prompt_template_func, batch_size=5):
+            full_response = ""
+            total_items = len(item_list)
+            for i in range(0, total_items, batch_size):
+                batch = item_list[i:i + batch_size]
+                prompt = prompt_template_func(batch)
+                response = model.generate_content(prompt)
+                batch_response = response.text.strip()
+                # Clean up any malformed HTML
+                batch_response = batch_response.replace("**", "<strong>")
+                open_tags = batch_response.count("<strong>") - batch_response.count("</strong>")
+                if open_tags > 0:
+                    batch_response += "</strong>" * open_tags
+                full_response += batch_response + "<br><br>"
+            return full_response.strip()
+
+        # Build prompt based on context
+        if context_type == "pending_projects":
+            if not data:
+                return "No pending projects found."
+            print(f"[DEBUG] Pending Projects Count: {len(data)}")
+            def prompt_func(batch):
+                project_list = format_item_list(batch, "project")
+                return f"""
+                    You are responding to {user_role}.
+                    Here are your pending projects:
+                    {project_list}
+                    Appreciate their involvement and provide a clear overview of each project with its current status.
+                    Include motivational language and recognition of effort.
+                    Wrap key names like project titles and statuses in HTML <strong> tags so they can be styled on the frontend.
+                    Keep your response under 2-3 sentences and conversational.
+                """
+            return generate_batched_response(data, prompt_func, batch_size=5)
+
+        elif context_type == "completed_projects":
+            if not data:
+                return "No completed projects found."
+            print(f"[DEBUG] Completed Projects Count: {len(data)}")
+            def prompt_func(batch):
+                project_list = format_item_list(batch, "project")
+                return f"""
+                    You are responding to {user_role}.
+                    Here are your completed projects:
+                    {project_list}
+                    Celebrate their achievements and provide a clear overview of each project with its current status.
+                    Include motivational language and wrap important terms like project names and statuses in HTML <strong> tags.
+                    Keep your response under 2-3 sentences and conversational.
+                """
+            return generate_batched_response(data, prompt_func, batch_size=5)
+
+        elif context_type == "pending_tasks":
+            if not data:
+                return "No pending tasks found."
+            print(f"[DEBUG] Pending Tasks Count: {len(data)}")
+            def prompt_func(batch):
+                task_list = format_item_list(batch, "task")
+                return f"""
+                    You are responding to {user_role}.
+                    Here are your pending tasks:
+                    {task_list}
+                    Recognize their efforts and provide a clear overview of each task with its current status.
+                    Include motivational language and wrap important terms like task names and statuses in HTML <strong> tags.
+                    Keep your response under 2-3 sentences and conversational.
+                """
+            return generate_batched_response(data, prompt_func, batch_size=5)
+
+        elif context_type == "completed_tasks":
+            if not data:
+                return "No completed tasks found."
+            print(f"[DEBUG] Completed Tasks Count: {len(data)}")
+            def prompt_func(batch):
+                task_list = format_item_list(batch, "task")
+                return f"""
+                    You are responding to {user_role}.
+                    Here are your completed tasks:
+                    {task_list}
+                    Celebrate their progress and provide a clear overview of each task with its current status.
+                    Include motivational language and wrap important terms like task names and statuses in HTML <strong> tags.
+                    Keep your response under 2-3 sentences and conversational.
+                """
+            return generate_batched_response(data, prompt_func, batch_size=5)
+
+        elif context_type == "priority_tasks":
+            priority_level = additional_context if additional_context else "specified"
+            if not data:
+                return f"No {priority_level}-priority tasks found."
+            print(f"[DEBUG] Priority ({priority_level}) Tasks Count: {len(data)}")
+            def prompt_func(batch):
+                task_list = format_item_list(batch, "task")
+                return f"""
+                    You are responding to {user_role}.
+                    Here are your {priority_level}-priority tasks:
+                    {task_list}
+                    Acknowledge their focus and provide a clear overview of each task with its current status.
+                    Include motivational language and wrap important terms like task names and statuses in HTML <strong> tags.
+                    Keep your response under 2-3 sentences and conversational.
+                """
+            return generate_batched_response(data, prompt_func, batch_size=5)
+
+        elif context_type == "all_projects_status":
+            if not data:
+                return "No projects found."
+            print(f"[DEBUG] All Projects Status Count: {len(data)}")
+            def prompt_func(batch):
+                project_list = format_item_list(batch, "project")
+                return f"""
+                    You are responding to {user_role}.
+                    Here is the current status of all your projects:
+                    {project_list}
+                    Appreciate their involvement and provide a clear overview of each project with its current status.
+                    Include motivational language and wrap important terms in HTML <strong> tags.
+                    Keep your response under 2-3 sentences and conversational.
+                """
+            return generate_batched_response(data, prompt_func, batch_size=5)
+
+        elif context_type == "all_tasks_status":
+            if not data:
+                return "No tasks found."
+            print(f"[DEBUG] All Tasks Status Count: {len(data)}")
+            def prompt_func(batch):
+                task_list = format_item_list(batch, "task")
+                return f"""
+                    You are responding to {user_role}.
+                    Here is the current status of all your tasks:
+                    {task_list}
+                    Recognize their contributions and motivate them.
+                    Include motivational language and wrap important terms in HTML <strong> tags.
+                    Keep your response under 2-3 sentences and conversational.
+                """
+            return generate_batched_response(data, prompt_func, batch_size=5)
+
+        elif context_type == "project_status":
+            project_name = additional_context.get("project_name", "the project")
+            status = additional_context.get("status", "Unknown")
+            prompt = f"You are responding to {user_role}. Generate a brief message about the status of project '<strong>{project_name}</strong>', which is currently '<strong>{status}</strong>'."
+            response = model.generate_content(prompt)
+            formatted_response = response.text.strip()
+            return formatted_response.replace("**", "<strong>").replace("\n", "<br>")
+
+        elif context_type == "task_status":
+            task_name = additional_context.get("task_name", "the task")
+            status = additional_context.get("status", "Unknown")
+            prompt = f"You are responding to {user_role}. Generate a brief message about the status of task '<strong>{task_name}</strong>', which is currently '<strong>{status}</strong>'."
+            response = model.generate_content(prompt)
+            formatted_response = response.text.strip()
+            return formatted_response.replace("**", "<strong>").replace("\n", "<br>")
+
+        elif context_type == "update_success":
+            item_type = additional_context.get("type", "item")
+            item_name = additional_context.get("name", "the item")
+            new_status = additional_context.get("new_status", "updated")
+            prompt = f"You are responding to {user_role}. Generate a brief confirmation message that the {item_type} '<strong>{item_name}</strong>' has been successfully updated to status '<strong>{new_status}</strong>'."
+            response = model.generate_content(prompt)
+            formatted_response = response.text.strip()
+            return formatted_response.replace("**", "<strong>").replace("\n", "<br>")
+
+        else:
+            prompt = f"Generate a brief response about the {context_type} data for {user_role}. Use HTML <strong> tags to highlight important information."
+            prompt += " Keep your response under 2-3 sentences and conversational. Make sure to use HTML <strong> tags for formatting instead of Markdown or other formats."
+            response = model.generate_content(prompt)
+            formatted_response = response.text.strip()
+            return formatted_response.replace("**", "<strong>").replace("\n", "<br>")
+
+    except Exception as e:
+        print(f"Gemini API Error: {e}")
+        if not data:
+            return f"No <strong>{context_type.replace('_', ' ')}</strong> found."
+        elif isinstance(data, list):
+            return f"Found <strong>{len(data)}</strong> {context_type.replace('_', ' ')}."
+        else:
+            return f"Information about <strong>{context_type.replace('_', ' ')}</strong> is available."
 
 # Serve the login page as default route
 @app.route('/')
@@ -843,7 +1015,7 @@ def handle_query():
         return response  # Return the response directly to the frontend
 
     if session.get("in_session") == "add_task":
-        response = handle_add_task_session(user_id, query,role)
+        response = handle_add_task_session(user_id, query, role)
         return response  # Return the response directly to the frontend
 
     # Get the projects accessible to this user for context
@@ -851,20 +1023,31 @@ def handle_query():
 
     # Parse the query using Gemini API (with user's project context)
     parsed_data = parse_query_with_gemini(query, user_projects)
+
     if "error" in parsed_data:
         return jsonify({"error": parsed_data["error"]}), 400
 
-    # Handle specific actions based on the parsed data
     action = parsed_data.get("action")
+
+    # ✅ Explicitly handle greetings, gratitude, identity, features
+    if action == "greeting":
+        return jsonify({"message": parsed_data["response"]}), 200
+    elif action == "gratitude":
+        return jsonify({"message": parsed_data["response"]}), 200
+    elif action == "bot_identity":
+        return jsonify({"message": parsed_data["response"]}), 200
+    elif action == "show_features":
+        return jsonify({"message": parsed_data["response"]}), 200
+
+    # Continue with original action handling
     if action == "start_add_project":
         session["in_session"] = "add_project"
         session["project_details"] = {}
         return jsonify({"message": "Sure! Let's add a new project. Please provide the title of the project."}), 200
 
     elif action == "start_add_task":
-        # Check if the user is an admin
         if role.lower() != 'admin':
-            return jsonify({"error": "Only admins can assign tasks. But You can View the Tasks Assigned to you"}), 403
+            return jsonify({"error": "Only admins can assign tasks. You can view tasks assigned to you."}), 403
         else:
             session["in_session"] = "add_task"
             session["task_details"] = {}
@@ -913,7 +1096,7 @@ def handle_query():
         return update_task_status(parsed_data, user_id, role)
 
     elif action == "update_project_status":
-        return update_project_status(parsed_data,user_id, role)
+        return update_project_status(parsed_data, user_id, role)
 
     else:
         return jsonify({"error": "Invalid query"}), 400
@@ -949,10 +1132,15 @@ def insert_project(user_id, data):
     VALUES (%s, %s, %s, %s, %s, %s)""", (data['project_name'], data['description'], data['start_date'], data['end_date'], 'Pending', user_id))
         conn.commit()
         log_activity(user_id, "Project_Creation", f"Created project: {data['project_name']}")
-        return jsonify({"message": "Project added successfully!"}), 200
-    except Exception as e:
-        print(f"Database Error: {e}")
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        # Format success message using Gemini
+        success_message = format_response_with_gemini(
+            None,  # No data required for this context
+            "user",  # Assuming standard user response
+            "update_success",
+            {"type": "project", "name": data['project_name'], "new_status": "created"}
+        )
+
+        return jsonify({"message": success_message}), 200
     finally:
         conn.close()
 
@@ -1023,23 +1211,41 @@ def handle_add_task_session(user_id, query, role):
     elif "project_id" not in task_details:
         try:
             project_id = int(query.strip())
-
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT 1 FROM Projects WHERE project_id = %s", (project_id,))
-            if not cursor.fetchone():
-                cursor.close()
-                conn.close()
-                return jsonify({"error": f"No project found with project_id {project_id}. Please enter a valid project ID."}), 400
-
+            result = cursor.fetchone()
             cursor.close()
             conn.close()
 
+            if not result:
+                return jsonify({"error": f"No project found with project_id {project_id}."}), 400
+
             task_details["project_id"] = project_id
+            task_details["project_name"] = result[0]
             session["task_details"] = task_details
-            return jsonify({"message": "Great! Now please provide the due date for the task (format: YYYY-MM-DD)."}), 200
+
+            return jsonify({
+                "message": f"The task will be added to the project '{result[0]}'. Is that okay? Reply 'yes' or 'no'."
+            }), 200
+
         except ValueError:
-            return jsonify({"error": "Invalid project ID. Please provide a valid numeric project ID."}), 400
+            return jsonify({"error": "Invalid project ID. Please enter a numeric value."}), 400
+
+    # Step 6: Confirm Project
+    elif "project_confirmed" not in task_details:
+        response = query.strip().lower()
+        if response == "yes":
+            task_details["project_confirmed"] = True
+            session["task_details"] = task_details
+            return jsonify({"message": "Almost done! Please provide the due date (YYYY-MM-DD)."}) ,200
+        elif response == "no":
+            task_details.pop("project_id")
+            task_details.pop("project_name")
+            session["task_details"] = task_details
+            return jsonify({"message": "Please provide the correct project ID for this task."}), 200
+        else:
+            return jsonify({"error": "Please reply with 'yes' or 'no'."}), 400
 
     # Step 6: Collect due date
     elif "due_date" not in task_details:
@@ -1086,10 +1292,13 @@ def insert_task(user_id, data):
 
         conn.commit()
         log_activity(user_id, "Task_Creation", f"Created task: {data['task_name']}")
-        return jsonify({"message": "Task added successfully!"}), 200
+        # Optional: Use Gemini to generate success message
+        success_message = f"✅ The task '{data['task_name']}' has been successfully created with {data['priority']} priority."
+
+        return jsonify({"message": success_message}), 200
     except Exception as e:
         print(f"Database Error: {e}")
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to create task: {str(e)}"}), 500
     finally:
         conn.close()
 
@@ -1134,11 +1343,18 @@ def get_pending_projects(user_id, role):
 
             projects = list(projects_dict.values())
 
-        # Return the projects directly - will be sent to frontend
-        return projects, 200
+        # Process the data using Gemini API
+        response_message = format_response_with_gemini(projects, role, "pending_projects")
+
+        # Return the formatted response along with the raw data
+        return jsonify({
+            "message": response_message,
+            "projects": projects
+        }), 200
+
     except Exception as e:
         print(f"Database Error: {e}")
-        return {"error": f"Database error: {str(e)}"}, 500
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
         conn.close()
 
@@ -1183,11 +1399,18 @@ def get_completed_projects(user_id, role):
 
             projects = list(projects_dict.values())
 
-        # Return the projects directly - will be sent to frontend
-        return projects, 200
+        # Process the data using Gemini API
+        response_message = format_response_with_gemini(projects, role, "completed_projects")
+        
+        # Return the formatted response along with the raw data
+        return jsonify({
+            "message": response_message,
+            "projects": projects
+        }), 200
+        
     except Exception as e:
         print(f"Database Error: {e}")
-        return {"error": f"Database error: {str(e)}"}, 500
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
         conn.close()
 
@@ -1232,11 +1455,18 @@ def list_all_projects_status(user_id, role):
 
             projects = list(projects_dict.values())
 
-        # Return the projects directly - will be sent to frontend
-        return projects, 200
+        # Process the data using Gemini API
+        response_message = format_response_with_gemini(projects, role, "all_projects_status")
+        
+        # Return the formatted response along with the raw data
+        return jsonify({
+            "message": response_message,
+            "projects": projects
+        }), 200
+        
     except Exception as e:
         print(f"Database Error: {e}")
-        return {"error": f"Database error: {str(e)}"}, 500
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
         conn.close()
 
@@ -1266,12 +1496,24 @@ def get_project_status_by_name(project_name, user_id, role):
         if not has_access:
             return {"error": "You do not have access to this project"}, 403
 
-        # Return the project status in a format suitable for the frontend
-        return {"project_name": project_name, "status": status}, 200
+        # Process the data using Gemini API
+        project_data = {"project_name": project_name, "status": status}
+        response_message = format_response_with_gemini(
+            None,  # No list data
+            role,
+            "project_status",
+            project_data
+        )
+        
+        # Return the formatted response along with the raw data
+        return jsonify({
+            "message": response_message,
+            "project": project_data
+        }), 200
 
     except Exception as e:
         print(f"Database Error in get_project_status_by_name: {e}")
-        return {"error": f"Database error: {str(e)}"}, 500
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
 
     finally:
         conn.close()
@@ -1299,10 +1541,18 @@ def get_pending_tasks(user_id, role):
             tasks = [{"task_id": row[0], "task_name": row[1], "description": row[2], "due_date": row[3], "priority": row[4]} for row in rows]
 
         # Return the tasks directly - will be sent to frontend
-        return tasks, 200
+        # Process the data using Gemini API
+        response_message = format_response_with_gemini(tasks, role, "pending_tasks")
+        
+        # Return the formatted response along with the raw data
+        return jsonify({
+            "message": response_message,
+            "tasks": tasks
+        }), 200
+        
     except Exception as e:
         print(f"Database Error: {e}")
-        return {"error": f"Database error: {str(e)}"}, 500
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
         conn.close()
 
@@ -1329,11 +1579,18 @@ def get_completed_tasks(user_id, role):
             rows = cursor.fetchall()
             tasks = [{"task_id": row[0], "task_name": row[1], "description": row[2], "due_date": row[3], "priority": row[4]} for row in rows]
 
-        # Return the tasks directly - will be sent to frontend
-        return tasks, 200
+        # Process the data using Gemini API
+        response_message = format_response_with_gemini(tasks, role, "completed_tasks")
+        
+        # Return the formatted response along with the raw data
+        return jsonify({
+            "message": response_message,
+            "tasks": tasks
+        }), 200
+        
     except Exception as e:
         print(f"Database Error: {e}")
-        return {"error": f"Database error: {str(e)}"}, 500
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
         conn.close()
 
@@ -1346,24 +1603,31 @@ def list_all_tasks_status(user_id, role):
     try:
         # For admin, show status of all tasks
         if role.lower() == 'admin':
-            cursor.execute("SELECT task_name, status FROM Tasks")
+            cursor.execute("SELECT  task_name,  status FROM  Tasks")
             rows = cursor.fetchall()
             tasks = [{"task_name": row[0], "status": row[1]} for row in rows]
         else:
             # Get tasks assigned to the user
             cursor.execute("""
-    SELECT task_name, status
-    FROM Tasks
-    WHERE assigned_to = %s
-""", (user_id,))
+                SELECT task_name, status,
+                FROM Tasks
+                WHERE assigned_to = %s
+            """, (user_id,))
             rows = cursor.fetchall()
             tasks = [{"task_name": row[0], "status": row[1]} for row in rows]
 
-        # Return the tasks directly - will be sent to frontend
-        return tasks, 200
+        # Process the data using Gemini API
+        response_message = format_response_with_gemini(tasks, role, "all_tasks_status")
+        
+        # Return the formatted response along with the raw data
+        return jsonify({
+            "message": response_message,
+            "tasks": tasks
+        }), 200
+        
     except Exception as e:
         print(f"Database Error: {e}")
-        return {"error": f"Database error: {str(e)}"}, 500
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
         conn.close()
 
@@ -1389,11 +1653,18 @@ def get_low_priority_tasks(user_id, role):
             rows = cursor.fetchall()
             tasks = [{"task_id": row[0], "task_name": row[1], "description": row[2], "due_date": row[3], "priority": row[4]} for row in rows]
 
-        # Return the tasks directly - will be sent to frontend
-        return tasks, 200
+        # Process the data using Gemini API
+        response_message = format_response_with_gemini(tasks, role, "priority_tasks", "Low")
+        
+        # Return the formatted response along with the raw data
+        return jsonify({
+            "message": response_message,
+            "tasks": tasks
+        }), 200
+        
     except Exception as e:
         print(f"Database Error: {e}")
-        return {"error": f"Database error: {str(e)}"}, 500
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
         conn.close()
 
@@ -1419,11 +1690,18 @@ def get_medium_priority_tasks(user_id, role):
             rows = cursor.fetchall()
             tasks = [{"task_id": row[0], "task_name": row[1], "description": row[2], "due_date": row[3], "priority": row[4]} for row in rows]
 
-        # Return the tasks directly - will be sent to frontend
-        return tasks, 200
+        # Process the data using Gemini API
+        response_message = format_response_with_gemini(tasks, role, "priority_tasks", "Medium")
+        
+        # Return the formatted response along with the raw data
+        return jsonify({
+            "message": response_message,
+            "tasks": tasks
+        }), 200
+        
     except Exception as e:
         print(f"Database Error: {e}")
-        return {"error": f"Database error: {str(e)}"}, 500
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
         conn.close()
 
@@ -1450,11 +1728,18 @@ def get_high_priority_tasks(user_id, role):
             rows = cursor.fetchall()
             tasks = [{"task_id": row[0], "task_name": row[1], "description": row[2], "due_date": row[3], "priority": row[4]} for row in rows]
 
-        # Return the tasks directly - will be sent to frontend
-        return tasks, 200
+        # Process the data using Gemini API
+        response_message = format_response_with_gemini(tasks, role, "priority_tasks", "High")
+        
+        # Return the formatted response along with the raw data
+        return jsonify({
+            "message": response_message,
+            "tasks": tasks
+        }), 200
+        
     except Exception as e:
         print(f"Database Error: {e}")
-        return {"error": f"Database error: {str(e)}"}, 500
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
         conn.close()
 
@@ -1484,13 +1769,24 @@ def get_task_status_by_name(task_name, user_id, role):
         if not has_access:
             return {"error": "You do not have access to this task"}, 403
 
-        # Return the task status in a format suitable for the frontend
-        return {"task_name": task_name, "status": status}, 200
+        # Process the data using Gemini API
+        task_data = {"task_name": task_name, "status": status}
+        response_message = format_response_with_gemini(
+            None,  # No list data
+            role,
+            "task_status",
+            task_data
+        )
+    
+        # Return the formatted response along with the raw data
+        return jsonify({
+            "message": response_message,
+            "task": task_data
+        }), 200
 
     except Exception as e:
         print(f"Database Error in get_task_status_by_name: {e}")
-        return {"error": f"Database error: {str(e)}"}, 500
-
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
     finally:
         conn.close()
 
@@ -1523,7 +1819,15 @@ def update_task_status(data, user_id, role):
         conn.commit()
 
         log_activity(user_id, "Task_Update", f"Updated task '{task_name}' status to '{new_status}'")
-        return {"message": f"Task '{task_name}' status updated successfully!"}, 200
+        # Process the data using Gemini API
+        response_message = format_response_with_gemini(
+            None,  # No list data needed
+            role,
+            "update_success",
+            {"type": "task", "name": task_name, "new_status": new_status}
+        )
+        
+        return jsonify({"message": response_message}), 200
 
     except Exception as e:
         print(f"Database Error: {e}")
@@ -1563,11 +1867,15 @@ def update_project_status(data, user_id, role):
 
         log_activity(user_id, "Project_Status_Update", f"Updated project '{project_name}' status to '{new_status}'")
 
-        return {
-            "project_name": project_name,
-            "new_status": new_status,
-            "message": f"Project '{project_name}' status updated successfully to '{new_status}'!"
-        }, 200
+        # Process the data using Gemini API
+        response_message = format_response_with_gemini(
+            None,  # No list data needed
+            role,
+            "update_success",
+            {"type": "project", "name": project_name, "new_status": new_status}
+        )
+        
+        return jsonify({"message": response_message}), 200
 
     except Exception as e:
         print(f"Database Error: {e}")
