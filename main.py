@@ -22,12 +22,11 @@ genai.configure(api_key=GEMINI_API_KEY)
 # Update the database connection function to use mysql.connector
 def get_db_connection():
     DB_Password = os.environ.get("DB_Password")
-    DB_User = os.environ.get("DB_Password")
     DB_Name = os.environ.get("DB_Name")
     try:
         return mysql.connector.connect(
             host="sql12.freesqldatabase.com",        # Replace with your actual host
-            user=DB_User,               # Your database username
+            user="sql12776862",               # Your database username
             password=DB_Password,          # Your DB password
             database=DB_Name,
             port= 3306
