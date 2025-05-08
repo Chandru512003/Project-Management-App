@@ -843,12 +843,23 @@ function formatBotResponse(result) {
             case 'list_all_users':
                 if (Array.isArray(result.users)) {
                         let response = `<strong>${formatActionTitle(result.action)}:</strong><br>`;
-                        result.tasks.forEach(user => {
+                        result.users.forEach(user => {
                             response += `• <span class="highlight-task">${user.username || 'Unnamed'}</span>: <span class="highlight-status">${user.role || 'Unknown'}</span> (Priority: <span class="highlight-priority">${user.user_id || 'Unspecified'}</span>)<br>`;
                         });
                         return response;
                     } else {
                         return `<span class="highlight-error">No Users found.</span>`;
+                    }
+
+                case 'get_user_activity':
+                if (Array.isArray(result.activities)) {
+                        let response = `<strong>${formatActionTitle(result.action)}:</strong><br>`;
+                        result.activities.forEach(activity => {
+                            response += `• <span class="highlight-task">${activity.username || 'Unnamed'}</span>: <span class="highlight-status">${user.activity_type || 'Unknown'}</span> (Priority: <span class="highlight-priority">${user.description || 'Unspecified'}</span>)<br>`;
+                        });
+                        return response;
+                    } else {
+                        return `<span class="highlight-error">No Activity found.</span>`;
                     }
 
             case 'get_project_status':

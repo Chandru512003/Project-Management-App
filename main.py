@@ -1992,7 +1992,7 @@ def get_user_activity(user_name, role):
             SELECT activity_type, description
             FROM Activity_Log
             WHERE user_id = (
-                SELECT user_id FROM Users WHERE user_name = %s
+                SELECT user_id FROM Users WHERE username = %s
             )
         """, (user_name,))
         result = cursor.fetchone()
