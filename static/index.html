@@ -840,7 +840,7 @@ function formatBotResponse(result) {
                     return `<span class="highlight-error">No tasks found.</span>`;
                 }
 
-            case 'get_all_users':
+            case 'list_all_users':
                 if (Array.isArray(result.users)) {
                         let response = `<strong>${formatActionTitle(result.action)}:</strong><br>`;
                         result.tasks.forEach(user => {
