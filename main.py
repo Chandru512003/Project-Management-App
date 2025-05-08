@@ -560,7 +560,7 @@ def parse_query_with_gemini(query, user_projects=None, context=None):
         If the query is about checking a task's status, respond with:
         ACTION: get_task_status
         TASK_NAME: [extracted task name]
-        If the query is about checking a user's activity, respond with:
+        If the query is about checking a user's activity or asking about a user, respond with:
         ACTION: get_user_activity
         USER_NAME: [extracted user name]
         If the query is about updating a task status, respond with:
@@ -822,7 +822,7 @@ def format_response_with_gemini(data, user_role, context_type, additional_contex
                     You are responding to {user_role}.
                     Here are your Users list:
                     {activity_list}
-                    Provide a clear overview of each User's Activity like Project_Creation, Task_Creation, Project_Status_Update, Task_Status_Update and Password_Reset.
+                    List out all the Activities of the User properly and Provide a clear overview of each User's Activity like Project_Creation, Task_Creation, Project_Status_Update, Task_Status_Update and Password_Reset.
                     Wrap important terms like usernames and  and activity_type and description in HTML <strong> tags.
                     Keep your response under 2-3 sentences and conversational.
                 """

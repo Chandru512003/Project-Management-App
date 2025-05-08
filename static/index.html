@@ -855,7 +855,7 @@ function formatBotResponse(result) {
                 if (Array.isArray(result.activities)) {
                         let response = `<strong>${formatActionTitle(result.action)}:</strong><br>`;
                         result.activities.forEach(activity => {
-                            response += `• <span class="highlight-task">${activity.username || 'Unnamed'}</span>: <span class="highlight-status">${user.activity_type || 'Unknown'}</span> (Priority: <span class="highlight-priority">${user.description || 'Unspecified'}</span>)<br>`;
+                            response += `• <span class="highlight-task">${activity.username || 'Unnamed'}</span>: <span class="highlight-status">${activity.activity_type || 'Unknown'}</span> (Priority: <span class="highlight-priority">${activity.description || 'Unspecified'}</span>)<br>`;
                         });
                         return response;
                     } else {
