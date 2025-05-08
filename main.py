@@ -307,14 +307,14 @@ def api_verify_identity():
     email = data.get('email')
     security = data.get('security')
     answer = data.get('answer')
-    
+
     if not username or not email or not security or not answer:
         return jsonify({"error": "All fields are required"}), 400
-    
+
     try:
         conn = get_db_connection()
         cursor = conn.cursor(buffered=True)  # Using buffered cursor for MySQL
-        
+
         # Fetch user data based on username and email (case-insensitive match)
         # MySQL LOWER() function for case-insensitive matching
         cursor.execute("""
@@ -322,23 +322,23 @@ def api_verify_identity():
             FROM Users
             WHERE LOWER(username) = LOWER(%s) AND LOWER(email) = LOWER(%s)
         """, (username, email))
-        
+
         user = cursor.fetchone()
-        
+
         if not user:
             return jsonify({"error": "Invalid username or email."}), 404
-        
+
         user_id = user[0]
         stored_question = user[1]
         stored_answer = user[2]
-        
+
         # Validate security question and answer (case-insensitive)
         if str(stored_question) != str(security):
             return jsonify({"error": "Incorrect security question selected."}), 400
-        
+
         if stored_answer.lower().strip() != answer.lower().strip():
             return jsonify({"error": "Incorrect security answer."}), 400
-        
+
         # Return success with user_id for the next step
         return jsonify({
             "message": "Identity verified successfully.",
@@ -360,33 +360,33 @@ def api_forgot_password():
     data = request.json
     user_id = data.get('user_id')
     new_password = data.get('new_password')
-    
+
     if not user_id or not new_password:
         return jsonify({"error": "User ID and new password are required"}), 400
-    
+
     try:
         conn = get_db_connection()
         cursor = conn.cursor(buffered=True)  # Using buffered cursor for MySQL
-        
+
         # Get username for activity log
         cursor.execute("SELECT username FROM Users WHERE user_id = %s", (user_id,))
         user = cursor.fetchone()
         if not user:
             return jsonify({"error": "User not found."}), 404
-            
+
         username = user[0]
-        
+
         # Update password
         new_password_hash = generate_password_hash(new_password)
-        
+
         cursor.execute("""
             UPDATE Users
             SET password_hash = %s
             WHERE user_id = %s
         """, (new_password_hash, user_id))
-        
+
         conn.commit()
-        
+
         # Optional: Log password reset
         try:
             log_activity(user_id, "Password_Reset", f"User {username} reset their password.")
@@ -560,6 +560,9 @@ def parse_query_with_gemini(query, user_projects=None, context=None):
         If the query is about checking a task's status, respond with:
         ACTION: get_task_status
         TASK_NAME: [extracted task name]
+        If the query is about checking a user's activity, respond with:
+        ACTION: get_user_activity
+        USER_NAME: [extracted user name]
         If the query is about updating a task status, respond with:
         ACTION: update_task_status
         TASK_NAME: [extracted task name]
@@ -631,6 +634,11 @@ def parse_query_with_gemini(query, user_projects=None, context=None):
             if not task_match:
                 return {"error": "Could not identify task name"}
             return {"action": "get_task_status", "task_name": task_match.group(1).strip()}
+        elif action == "get_user_activity":
+            user_match = re.search(r"USER_NAME:\s*(.+)$", interpreted_text, re.MULTILINE)
+            if not user_match:
+                return {"error": "Could not identify user name"}
+            return {"action": "get_user_activity", "user_name": user_match.group(1).strip()}
         elif action == "update_project_status":
             status_match = re.search(r"NEW_STATUS:\s*(.+)$", interpreted_text, re.MULTILINE)
             project_match = re.search(r"PROJECT_NAME:\s*(.+)$", interpreted_text, re.MULTILINE)
@@ -787,6 +795,7 @@ def format_response_with_gemini(data, user_role, context_type, additional_contex
                     Keep your response under 2-3 sentences and conversational.
                 """
             return generate_batched_response(data, prompt_func, batch_size=5)
+
         elif context_type == "all_users":
             if not data:
                 return "No Users found."
@@ -799,6 +808,22 @@ def format_response_with_gemini(data, user_role, context_type, additional_contex
                     {user_list}
                     Provide a clear overview of each user with their role.
                     Wrap important terms like usernames and user_ids and role in HTML <strong> tags.
+                    Keep your response under 2-3 sentences and conversational.
+                """
+            return generate_batched_response(data, prompt_func, batch_size=5)
+        
+        elif context_type == "users_activity":
+            if not data:
+                return "No Activity found."
+            print(f"[DEBUG] Activities Count: {len(data)}")
+            def prompt_func(batch):
+                activity_list = format_item_list(batch, "user")
+                return f"""
+                    You are responding to {user_role}.
+                    Here are your Users list:
+                    {activity_list}
+                    Provide a clear overview of each User's Activity.
+                    Wrap important terms like usernames and  and activity_type and description in HTML <strong> tags.
                     Keep your response under 2-3 sentences and conversational.
                 """
             return generate_batched_response(data, prompt_func, batch_size=5)
@@ -1125,6 +1150,15 @@ def handle_query():
             return jsonify({"error": "Task name not provided"}), 400
         return get_task_status_by_name(task_name, user_id, role)
 
+    elif action == "get_user_activity":
+        if role.lower() != 'admin':
+            return jsonify({"error": "Only admins can access a specific user's Activity."}), 403
+        else:
+            user_name = parsed_data.get("user_name")
+            if not user_name:
+                return jsonify({"error": "User name not provided"}), 400
+            return get_user_activity(user_name, role)
+
     elif action == "update_task_status":
         return update_task_status(parsed_data, user_id, role)
 
@@ -1434,13 +1468,13 @@ def get_completed_projects(user_id, role):
 
         # Process the data using Gemini API
         response_message = format_response_with_gemini(projects, role, "completed_projects")
-        
+
         # Return the formatted response along with the raw data
         return jsonify({
             "message": response_message,
             "projects": projects
         }), 200
-        
+
     except Exception as e:
         print(f"Database Error: {e}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
@@ -1490,13 +1524,13 @@ def list_all_projects_status(user_id, role):
 
         # Process the data using Gemini API
         response_message = format_response_with_gemini(projects, role, "all_projects_status")
-        
+
         # Return the formatted response along with the raw data
         return jsonify({
             "message": response_message,
             "projects": projects
         }), 200
-        
+
     except Exception as e:
         print(f"Database Error: {e}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
@@ -1537,7 +1571,7 @@ def get_project_status_by_name(project_name, user_id, role):
             "project_status",
             project_data
         )
-        
+
         # Return the formatted response along with the raw data
         return jsonify({
             "message": response_message,
@@ -1576,13 +1610,13 @@ def get_pending_tasks(user_id, role):
         # Return the tasks directly - will be sent to frontend
         # Process the data using Gemini API
         response_message = format_response_with_gemini(tasks, role, "pending_tasks")
-        
+
         # Return the formatted response along with the raw data
         return jsonify({
             "message": response_message,
             "tasks": tasks
         }), 200
-        
+
     except Exception as e:
         print(f"Database Error: {e}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
@@ -1614,13 +1648,13 @@ def get_completed_tasks(user_id, role):
 
         # Process the data using Gemini API
         response_message = format_response_with_gemini(tasks, role, "completed_tasks")
-        
+
         # Return the formatted response along with the raw data
         return jsonify({
             "message": response_message,
             "tasks": tasks
         }), 200
-        
+
     except Exception as e:
         print(f"Database Error: {e}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
@@ -1651,13 +1685,13 @@ def list_all_tasks_status(user_id, role):
 
         # Process the data using Gemini API
         response_message = format_response_with_gemini(tasks, role, "all_tasks_status")
-        
+
         # Return the formatted response along with the raw data
         return jsonify({
             "message": response_message,
             "tasks": tasks
         }), 200
-        
+
     except Exception as e:
         print(f"Database Error: {e}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
@@ -1688,13 +1722,13 @@ def get_low_priority_tasks(user_id, role):
 
         # Process the data using Gemini API
         response_message = format_response_with_gemini(tasks, role, "priority_tasks", "Low")
-        
+
         # Return the formatted response along with the raw data
         return jsonify({
             "message": response_message,
             "tasks": tasks
         }), 200
-        
+
     except Exception as e:
         print(f"Database Error: {e}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
@@ -1725,13 +1759,13 @@ def get_medium_priority_tasks(user_id, role):
 
         # Process the data using Gemini API
         response_message = format_response_with_gemini(tasks, role, "priority_tasks", "Medium")
-        
+
         # Return the formatted response along with the raw data
         return jsonify({
             "message": response_message,
             "tasks": tasks
         }), 200
-        
+
     except Exception as e:
         print(f"Database Error: {e}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
@@ -1763,13 +1797,13 @@ def get_high_priority_tasks(user_id, role):
 
         # Process the data using Gemini API
         response_message = format_response_with_gemini(tasks, role, "priority_tasks", "High")
-        
+
         # Return the formatted response along with the raw data
         return jsonify({
             "message": response_message,
             "tasks": tasks
         }), 200
-        
+
     except Exception as e:
         print(f"Database Error: {e}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
@@ -1810,7 +1844,7 @@ def get_task_status_by_name(task_name, user_id, role):
             "task_status",
             task_data
         )
-    
+
         # Return the formatted response along with the raw data
         return jsonify({
             "message": response_message,
@@ -1859,7 +1893,7 @@ def update_task_status(data, user_id, role):
             "update_success",
             {"type": "task", "name": task_name, "new_status": new_status}
         )
-        
+
         return jsonify({"message": response_message}), 200
 
     except Exception as e:
@@ -1907,7 +1941,7 @@ def update_project_status(data, user_id, role):
             "update_success",
             {"type": "project", "name": project_name, "new_status": new_status}
         )
-        
+
         return jsonify({"message": response_message}), 200
 
     except Exception as e:
@@ -1942,6 +1976,53 @@ def get_all_users(role):
     except Exception as e:
         print(f"Database Error: {e}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
+    finally:
+        conn.close()
+
+# Fixed function to retrieve the status of a specific project (with access check)
+def get_user_activity(user_name, role):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # First get the project ID to check access - add better error handling and logging
+        print(f"Querying user: '{user_name}'")
+
+        # Fix parameter binding by using a tuple
+        cursor.execute("""
+            SELECT activity_type, description
+            FROM Activity_log
+            WHERE user_id = (
+                SELECT user_id FROM Users WHERE user_name = %s
+            )
+        """, (user_name,))
+        result = cursor.fetchone()
+
+        if not result:
+            print(f"User not found: '{user_name}'")
+            return {"error": "User not found"}, 404
+
+        activity_type, description = result
+        print(f"Found activity_type: {activity_type}, description: {description}")
+
+        # Process the data using Gemini API
+        activity_data = {"username":user_name,"activity_type": activity_type, "description": description}
+        response_message = format_response_with_gemini(
+            None,  # No list data
+            role,
+            "user_activity",
+            activity_data
+        )
+
+        # Return the formatted response along with the raw data
+        return jsonify({
+            "message": response_message,
+            "activity": activity_data
+        }), 200
+
+    except Exception as e:
+        print(f"Database Error in get_user_activity: {e}")
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+
     finally:
         conn.close()
 
