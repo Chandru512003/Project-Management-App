@@ -840,6 +840,17 @@ function formatBotResponse(result) {
                     return `<span class="highlight-error">No tasks found.</span>`;
                 }
 
+            case 'get_all_users':
+                if (Array.isArray(result.users)) {
+                        let response = `<strong>${formatActionTitle(result.action)}:</strong><br>`;
+                        result.tasks.forEach(user => {
+                            response += `• <span class="highlight-task">${user.username || 'Unnamed'}</span>: <span class="highlight-status">${user.role || 'Unknown'}</span> (Priority: <span class="highlight-priority">${user.user_id || 'Unspecified'}</span>)<br>`;
+                        });
+                        return response;
+                    } else {
+                        return `<span class="highlight-error">No Users found.</span>`;
+                    }
+
             case 'get_project_status':
                 return `Project Status: <span class="highlight-project">${result.project_name || 'Unknown project'}</span>`;
 

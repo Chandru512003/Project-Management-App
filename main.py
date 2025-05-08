@@ -23,17 +23,20 @@ genai.configure(api_key=GEMINI_API_KEY)
 def get_db_connection():
     DB_Password = os.environ.get("DB_Password")
     DB_Name = os.environ.get("DB_Name")
-    try:
-        return mysql.connector.connect(
-            host="sql12.freesqldatabase.com",        # Replace with your actual host
-            user="sql12776862",               # Your database username
-            password=DB_Password,          # Your DB password
-            database=DB_Name,
-            port= 3306
-        )
-    except Error as e:
-        print(f"Database Connection Error: {e}")
-        raise
+    if not DB_Name and DB_Password:
+        raise ValueError("Missing DB_Password and DB_Name environment variable")
+    else:
+        try:
+            return mysql.connector.connect(
+                host="sql12.freesqldatabase.com",        # Replace with your actual host
+                user="sql12776862",               # Your database username
+                password=DB_Password,          # Your DB password
+                database=DB_Name,
+                port= 3306
+            )
+        except Error as e:
+            print(f"Database Connection Error: {e}")
+            raise
 
 # Authentication middleware
 def login_required(f):
@@ -569,6 +572,8 @@ def parse_query_with_gemini(query, user_projects=None, context=None):
         ACTION: start_add_project
         If the query is about adding a new task, respond with:
         ACTION: start_add_task
+        If the query is about listing all Users, respond with:
+        ACTION: list_all_users
         If the query is about listing pending projects, respond with:
         ACTION: list_pending_projects
         If the query is about listing completed projects, respond with:
@@ -650,6 +655,8 @@ def parse_query_with_gemini(query, user_projects=None, context=None):
             return {"action": "start_add_project"}
         elif action == "start_add_task":
             return {"action": "start_add_task"}
+        elif action == "list_all_users":
+            return {"action": "list_all_users"}
         elif action == "list_pending_projects":
             return {"action": "list_pending_projects"}
         elif action == "list_completed_projects":
@@ -776,6 +783,21 @@ def format_response_with_gemini(data, user_role, context_type, additional_contex
                     Here are your completed tasks:
                     {task_list}
                     Celebrate their progress and provide a clear overview of each task with its current status.
+                    Include motivational language and wrap important terms like task names and statuses in HTML <strong> tags.
+                    Keep your response under 2-3 sentences and conversational.
+                """
+            return generate_batched_response(data, prompt_func, batch_size=5)
+        elif context_type == "all_users":
+            if not data:
+                return "No User found."
+            print(f"[DEBUG] Users Count: {len(data)}")
+            def prompt_func(batch):
+                user_list = format_item_list(batch, "user")
+                return f"""
+                    You are responding to {user_role}.
+                    Here are your Users list:
+                    {user_list}
+                    Provide a clear overview of each user with their role.
                     Include motivational language and wrap important terms like task names and statuses in HTML <strong> tags.
                     Keep your response under 2-3 sentences and conversational.
                 """
@@ -1057,6 +1079,12 @@ def handle_query():
             session["in_session"] = "add_task"
             session["task_details"] = {}
             return jsonify({"message": "Sure! Let's add a new task. Please provide the name of the task."}), 200
+
+    elif action == "list_all_users":
+        if role.lower() != 'admin':
+            return jsonify({"error": "Only admins can see all Users."}), 403
+        else:
+            return get_all_users(role)
 
     elif action == "list_pending_projects":
         return get_pending_projects(user_id, role)
@@ -1889,6 +1917,33 @@ def update_project_status(data, user_id, role):
     finally:
         conn.close()
 
+# Fixed function to retrieve completed projects (with role-based filtering)
+def get_all_users(role):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    users = []
+
+    try:
+        # For admin, show all completed projects
+        if role.lower() == 'admin':
+            cursor.execute("SELECT user_id, username, email, role FROM Users")
+            rows = cursor.fetchall()
+            users = [{"user_id": row[0], "username": row[1], "email": row[2], "role": row[3]} for row in rows]
+
+        # Process the data using Gemini API
+        response_message = format_response_with_gemini(users, role, "all_users")
+
+        # Return the formatted response along with the raw data
+        return jsonify({
+            "message": response_message,
+            "users": users
+        }), 200
+
+    except Exception as e:
+        print(f"Database Error: {e}")
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+    finally:
+        conn.close()
 
 # Function to log user activity
 def log_activity(user_id, activity_type, description):
