@@ -701,7 +701,7 @@ def format_response_with_gemini(data, user_role, context_type, additional_contex
         # Helper to build formatted item lists
         def format_item_list(items, type_name="item"):
             return "<br>".join([
-                f"<strong>{item.get(f'{type_name}_name', 'Unnamed')}</strong> (<strong>{item.get('status', 'Unknown')}</strong>)"
+                f"<strong>{item.get(f'{type_name}_name', 'Unnamed')}</strong> (<strong>{item.get('status', 'Unknown')}</strong>) (<strong>{item.get('username', 'Unknown')}</strong>) (<strong>{item.get('user_id', 'Unknown')}</strong>) (<strong>{item.get('role', 'Unknown')}</strong>)"
                 for item in items
             ])
 
@@ -789,7 +789,7 @@ def format_response_with_gemini(data, user_role, context_type, additional_contex
             return generate_batched_response(data, prompt_func, batch_size=5)
         elif context_type == "all_users":
             if not data:
-                return "No User found."
+                return "No Users found."
             print(f"[DEBUG] Users Count: {len(data)}")
             def prompt_func(batch):
                 user_list = format_item_list(batch, "user")
@@ -798,7 +798,7 @@ def format_response_with_gemini(data, user_role, context_type, additional_contex
                     Here are your Users list:
                     {user_list}
                     Provide a clear overview of each user with their role.
-                    Include motivational language and wrap important terms like usernames and user_ids and role in HTML <strong> tags.
+                    Wrap important terms like usernames and user_ids and role in HTML <strong> tags.
                     Keep your response under 2-3 sentences and conversational.
                 """
             return generate_batched_response(data, prompt_func, batch_size=5)
