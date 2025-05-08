@@ -575,7 +575,7 @@ def parse_query_with_gemini(query, user_projects=None, context=None):
         ACTION: start_add_project
         If the query is about adding a new task, respond with:
         ACTION: start_add_task
-        If the query is about listing all Users, respond with:
+        If the query is about listing or all Users, to get all Users details respond with:
         ACTION: list_all_users
         If the query is about listing pending projects, respond with:
         ACTION: list_pending_projects
