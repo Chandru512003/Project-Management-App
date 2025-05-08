@@ -1990,7 +1990,7 @@ def get_user_activity(user_name, role):
         # Fix parameter binding by using a tuple
         cursor.execute("""
             SELECT activity_type, description
-            FROM Activity_log
+            FROM Activity_Log
             WHERE user_id = (
                 SELECT user_id FROM Users WHERE user_name = %s
             )
