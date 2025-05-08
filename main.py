@@ -1951,7 +1951,7 @@ def update_project_status(data, user_id, role):
     finally:
         conn.close()
 
-# Fixed function to retrieve completed projects (with role-based filtering)
+# Fixed function to retrieve all users
 def get_all_users(role):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1979,15 +1979,13 @@ def get_all_users(role):
     finally:
         conn.close()
 
-# Fixed function to retrieve the status of a specific project (with access check)
+# Fixed function to retrieve the activities of a specific user
 def get_user_activity(user_name, role):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # First get the project ID to check access - add better error handling and logging
         print(f"Querying user: '{user_name}'")
 
-        # Fix parameter binding by using a tuple
         cursor.execute("""
             SELECT activity_type, description
             FROM Activity_Log
@@ -1999,14 +1997,17 @@ def get_user_activity(user_name, role):
         result = cursor.fetchall()
 
         if not result:
-            print(f"User not found: '{user_name}'")
-            return {"error": "User not found"}, 404
+            print(f"No activity found for user: '{user_name}'")
+            return {"error": "No activity found for this user"}, 404
 
-        activity_type, description = result
-        print(f"Found activity_type: {activity_type}, description: {description}")
+        # If you want to return ALL activities
+        activity_list = [
+            {"activity_type": activity_type, "description": description}
+            for activity_type, description in result
+        ]
 
-        # Process the data using Gemini API
-        activity_data = {"username":user_name,"activity_type": activity_type, "description": description}
+        # Format with Gemini – assuming your formatter accepts lists
+        activity_data = {"username": user_name, "activities": activity_list}
         response_message = format_response_with_gemini(
             None,  # No list data
             role,
@@ -2014,7 +2015,6 @@ def get_user_activity(user_name, role):
             activity_data
         )
 
-        # Return the formatted response along with the raw data
         return jsonify({
             "message": response_message,
             "activity": activity_data
@@ -2026,6 +2026,7 @@ def get_user_activity(user_name, role):
 
     finally:
         conn.close()
+
 
 # Function to log user activity
 def log_activity(user_id, activity_type, description):
