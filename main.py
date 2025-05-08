@@ -2009,7 +2009,6 @@ def get_user_activity(user_name, role):
         # Format with Gemini – assuming your formatter accepts lists
         activity_data = {"username": user_name, "activities": activity_list}
         response_message = format_response_with_gemini(
-            None,  # No list data
             role,
             "user_activity",
             activity_data

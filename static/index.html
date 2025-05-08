@@ -851,16 +851,16 @@ function formatBotResponse(result) {
                         return `<span class="highlight-error">No Users found.</span>`;
                     }
 
-                case 'get_user_activity':
+            case 'get_user_activity':
                 if (Array.isArray(result.activities)) {
-                        let response = `<strong>${formatActionTitle(result.action)}:</strong><br>`;
-                        result.activities.forEach(activity => {
-                            response += `• <span class="highlight-task">${activity.username || 'Unnamed'}</span>: <span class="highlight-status">${activity.activity_type || 'Unknown'}</span> (Priority: <span class="highlight-priority">${activity.description || 'Unspecified'}</span>)<br>`;
-                        });
-                        return response;
-                    } else {
-                        return `<span class="highlight-error">No Activity found.</span>`;
-                    }
+                    let response = `<strong>User Activity for ${result.activities[0].username}:</strong><br>`;
+                    result.activities.forEach(activity => {
+                        response += `• <strong>${activity.activity_type}</strong>: ${activity.description}<br>`;
+                    });
+                    return response;
+                } else {
+                    return `<span class="highlight-error">No Activity found.</span>`;
+                }
 
             case 'get_project_status':
                 return `Project Status: <span class="highlight-project">${result.project_name || 'Unknown project'}</span>`;
