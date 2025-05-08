@@ -822,7 +822,7 @@ def format_response_with_gemini(data, user_role, context_type, additional_contex
                     You are responding to {user_role}.
                     Here are your Users list:
                     {activity_list}
-                    Provide a clear overview of each User's Activity.
+                    Provide a clear overview of each User's Activity like Project_Creation, Task_Creation, Project_Status_Update, Task_Status_Update and Password_Reset.
                     Wrap important terms like usernames and  and activity_type and description in HTML <strong> tags.
                     Keep your response under 2-3 sentences and conversational.
                 """
@@ -1994,8 +1994,9 @@ def get_user_activity(user_name, role):
             WHERE user_id = (
                 SELECT user_id FROM Users WHERE username = %s
             )
+            AND activity_type NOT IN ('User_Login', 'User_Logout', 'User_Registration')
         """, (user_name,))
-        result = cursor.fetchone()
+        result = cursor.fetchall()
 
         if not result:
             print(f"User not found: '{user_name}'")
