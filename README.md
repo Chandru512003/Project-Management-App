@@ -45,8 +45,8 @@ An intelligent chatbot assistant for managing software development projects usin
 ### ⚙️ Steps
 
 ```bash
-git clone https://github.com/yourusername/project-manager-assistant.git
-cd project-manager-assistant
+git clone https://github.com/Chandru512003/Project-Management-App.git
+cd Project-Management-App
 
 # Setup virtual environment (optional)
 python -m venv venv
