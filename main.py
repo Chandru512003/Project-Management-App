@@ -798,7 +798,7 @@ def format_response_with_gemini(data, user_role, context_type, additional_contex
                     Here are your Users list:
                     {user_list}
                     Provide a clear overview of each user with their role.
-                    Include motivational language and wrap important terms like task names and statuses in HTML <strong> tags.
+                    Include motivational language and wrap important terms like usernames and user_ids and role in HTML <strong> tags.
                     Keep your response under 2-3 sentences and conversational.
                 """
             return generate_batched_response(data, prompt_func, batch_size=5)
