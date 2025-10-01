@@ -29,7 +29,7 @@ def get_db_connection():
         try:
             return mysql.connector.connect(
                 host="sql12.freesqldatabase.com",        # Replace with your actual host
-                user="sql12776862",               # Your database username
+                user="sql12800929",               # Your database username
                 password=DB_Password,          # Your DB password
                 database=DB_Name,
                 port= 3306
