@@ -7,7 +7,7 @@ CREATE TABLE Users (
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     role VARCHAR(30) NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     password_hash VARCHAR(255) NOT NULL,
     security INT,
     answer VARCHAR(255)
@@ -36,7 +36,7 @@ CREATE TABLE Tasks (
     due_date DATE,
     status VARCHAR(30) DEFAULT 'Pending',
     priority VARCHAR(20),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (assigned_to) REFERENCES Users(user_id),
     FOREIGN KEY (project_id) REFERENCES Projects(project_id)
 );
@@ -47,7 +47,7 @@ CREATE TABLE Activity_Log (
     user_id INT,
     activity_type VARCHAR(50),
     description TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES Users(user_id)
 );
 
