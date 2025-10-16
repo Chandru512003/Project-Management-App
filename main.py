@@ -502,7 +502,7 @@ def register_page():
 # Function to parse natural language queries using Gemini API
 def parse_query_with_gemini(query, user_projects=None, context=None):
     try:
-        model = genai.GenerativeModel("models/gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-1.5-flash-latest")
         # Bot name
         bot_name = "Gemmo"
         # If we have user-specific projects, include them in the context
