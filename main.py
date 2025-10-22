@@ -502,7 +502,7 @@ def register_page():
 # Function to parse natural language queries using Gemini API
 def parse_query_with_gemini(query, user_projects=None, context=None):
     try:
-        model = genai.GenerativeModel("gemini-1.5-pro")
+        model = genai.GenerativeModel("gemini-2.5-pro")
         # Bot name
         bot_name = "Gemmo"
         # If we have user-specific projects, include them in the context
@@ -704,7 +704,7 @@ def parse_query_with_gemini(query, user_projects=None, context=None):
 #function to format the response to the user
 def format_response_with_gemini(data, user_role, context_type, additional_context=None):
     try:
-        model = genai.GenerativeModel("gemini-1.5-pro")  # Better handling of long prompts
+        model = genai.GenerativeModel("gemini-2.5-pro")  # Better handling of long prompts
 
         # Helper to build formatted item lists
         def format_item_list(items, type_name="item"):
